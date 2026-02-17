@@ -538,7 +538,9 @@ const editorApp = createApp({
       sharing: false,               // 是否正在分享
       shareUrl: null,               // 分享链接
       shareError: null,             // 分享错误信息
-      shareServerUrl: 'http://localhost:8080',  // 分享服务器地址
+      shareServerUrl: window.location.hostname === 'localhost' 
+        ? 'http://localhost:8080' 
+        : 'https://md.foolgry.top',  // 根据环境自动选择服务器地址
       shareCopySuccess: false       // 分享链接复制成功状态
     };
   },
