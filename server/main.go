@@ -54,8 +54,8 @@ func main() {
 	fileServer := http.FileServer(http.Dir(staticDir))
 	mux.Handle("/", fileServer)
 
-	// 配置 CORS
-	handler := enableCORS(mux)
+	// CORS 中间件
+	handler := corsMiddleware(mux)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -105,18 +105,37 @@ func initDB() error {
 	return nil
 }
 
-// enableCORS 启用跨域支持
-func enableCORS(next http.Handler) http.Handler {
+// CORS 中间件 - 处理跨域请求
+func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// 允许的来源（生产环境应配置为具体域名）
+		origin := r.Header.Get("Origin")
+		allowedOrigins := []string{
+			"https://admin.md.foolgry.top",
+			"http://localhost:8080",
+			"http://localhost:3000",
+		}
+		
+		// 检查是否允许的域名
+		for _, allowed := range allowedOrigins {
+			if origin == allowed {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				break
+			}
+		}
+		
+		// 允许的头部和方法
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Max-Age", "86400") // 24小时缓存预检结果
+		
+		// 处理预检请求
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
+		
 		next.ServeHTTP(w, r)
 	})
 }
@@ -466,7 +485,7 @@ func generateSharePageHTML(share Share) string {
         <span>公众号排版器</span>
       </a>
       <div class="header-actions">
-        <span class="style-badge">%%s</span>
+        <span class="style-badge">%s</span>
         <button class="btn" @click="copyContent">
           <span v-if="copySuccess">✓</span>
           <span class="btn-text">{{ copySuccess ? '已复制' : '复制内容' }}</span>
@@ -544,7 +563,7 @@ func generateSharePageHTML(share Share) string {
                 codeContent = str;
               }
               
-              return '<div style="margin: 20px 0; border-radius: 8px; overflow: hidden; background: #383a42; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">' + dots + '<div style="padding: 16px; overflow-x: auto; background: #383a42;"><code style="display: block; color: #abb2bf; font-family: \\'SF Mono\\', Monaco, \\'Cascadia Code\\', Consolas, monospace; font-size: 14px; line-height: 1.6; white-space: pre;">' + codeContent + '</code></div></div>';
+              return '<div style="margin: 20px 0; border-radius: 8px; overflow: hidden; background: #383a42; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">' + dots + '<div style="padding: 16px; overflow-x: auto; background: #383a42;"><code style="display: block; color: #abb2bf; font-family: &quot;SF Mono&quot;, Monaco, &quot;Cascadia Code&quot;, Consolas, monospace; font-size: 14px; line-height: 1.6; white-space: pre;">' + codeContent + '</code></div></div>';
             }
           });
         },
@@ -653,5 +672,5 @@ func generateSharePageHTML(share Share) string {
     }).mount('#app');
   </script>
 </body>
-</html>`, share.Style, share.Style, share.Content, share.Style)
+</html>`, share.Style, share.Content, share.Style)
 }
