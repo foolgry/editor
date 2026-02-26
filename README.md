@@ -70,6 +70,7 @@
 2. 输入管理密码
 3. 首次成功后密码会缓存在浏览器 `localStorage`（无过期）
 4. 页面会在请求头中自动携带 `X-List-Password` 调用 `/api/shares`
+5. 每条记录支持一键删除（调用 `DELETE /api/share/{id}`）
 
 ### 本地运行
 ```bash

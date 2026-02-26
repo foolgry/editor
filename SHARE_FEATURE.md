@@ -73,6 +73,7 @@ server/
 |------|------|------|
 | `/api/share` | POST | 创建分享 |
 | `/api/share/{id}` | GET | 获取分享内容 |
+| `/api/share/{id}` | DELETE | 删除分享（需 Header 密码） |
 | `/api/shares` | GET | 获取全部分享列表（需 Header 密码） |
 | `/s/{id}` | GET | 分享页面 |
 | `/list` | GET | 分享管理列表页面（输入密码后查看全部） |

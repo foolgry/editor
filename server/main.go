@@ -60,7 +60,7 @@ func main() {
 
 	// API 路由
 	mux.HandleFunc("/api/share", handleCreateShare)
-	mux.HandleFunc("/api/share/", handleGetShare)
+	mux.HandleFunc("/api/share/", handleShareByID)
 	mux.HandleFunc("/api/shares", handleListShares)
 
 	// 分享页面路由
@@ -210,17 +210,9 @@ func handleCreateShare(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, share)
 }
 
-// handleGetShare 获取分享内容
-func handleGetShare(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// 提取分享 ID
-	path := strings.TrimPrefix(r.URL.Path, "/api/share/")
-	shareID := strings.Split(path, "/")[0]
-
+// handleShareByID 按 ID 获取或删除分享
+func handleShareByID(w http.ResponseWriter, r *http.Request) {
+	shareID := extractShareID(r.URL.Path, "/api/share/")
 	if shareID == "" {
 		respondJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "分享 ID 不能为空",
@@ -228,7 +220,17 @@ func handleGetShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 查询数据库
+	switch r.Method {
+	case http.MethodGet:
+		handleGetShareByID(w, shareID)
+	case http.MethodDelete:
+		handleDeleteShareByID(w, r, shareID)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleGetShareByID(w http.ResponseWriter, shareID string) {
 	var share Share
 	err := db.QueryRow(
 		"SELECT id, content, style, created_at, updated_at FROM shares WHERE id = ?",
@@ -250,6 +252,44 @@ func handleGetShare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, share)
+}
+
+func handleDeleteShareByID(w http.ResponseWriter, r *http.Request, shareID string) {
+	if !isListAuthorized(r) {
+		respondJSON(w, http.StatusUnauthorized, map[string]string{
+			"error": "密码错误或缺失",
+		})
+		return
+	}
+
+	result, err := db.Exec("DELETE FROM shares WHERE id = ?", shareID)
+	if err != nil {
+		log.Printf("删除分享失败: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "删除分享失败",
+		})
+		return
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("获取删除影响行数失败: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "删除分享失败",
+		})
+		return
+	}
+	if affected == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{
+			"error": "分享不存在",
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"id":      shareID,
+		"message": "删除成功",
+	})
 }
 
 // handleListShares 获取全部分享列表（需要密码）
@@ -374,6 +414,11 @@ func handleListPage(w http.ResponseWriter, r *http.Request) {
 // generateShareID 生成分享 ID
 func generateShareID() string {
 	return uuid.New().String()[:8]
+}
+
+func extractShareID(path string, prefix string) string {
+	trimmed := strings.TrimPrefix(path, prefix)
+	return strings.Split(trimmed, "/")[0]
 }
 
 func isListAuthorized(r *http.Request) bool {
@@ -919,6 +964,13 @@ func generateListPageHTML() string {
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .btn-delete {
+      height: 32px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: #dc2626;
+      font-size: 13px;
+    }
     .error {
       color: #b91c1c;
       font-size: 13px;
@@ -992,6 +1044,7 @@ func generateListPageHTML() string {
     const authErrorEl = document.getElementById("authError");
     const statusEl = document.getElementById("status");
     const listWrapEl = document.getElementById("listWrap");
+    let currentPassword = "";
 
     function escapeHTML(text) {
       return String(text || "")
@@ -1027,11 +1080,12 @@ func generateListPageHTML() string {
           "<td>" + style + "</td>" +
           "<td>" + createdAt + "</td>" +
           "<td>" + updatedAt + "</td>" +
+          "<td><button class='btn-delete' data-id='" + id + "'>删除</button></td>" +
           "</tr>";
       }).join("");
 
       listWrapEl.innerHTML = "<table>" +
-        "<thead><tr><th style='width:120px;'>ID</th><th>标题</th><th style='width:140px;'>样式</th><th style='width:170px;'>创建时间</th><th style='width:170px;'>更新时间</th></tr></thead>" +
+        "<thead><tr><th style='width:120px;'>ID</th><th>标题</th><th style='width:140px;'>样式</th><th style='width:170px;'>创建时间</th><th style='width:170px;'>更新时间</th><th style='width:92px;'>操作</th></tr></thead>" +
         "<tbody>" + rows + "</tbody>" +
         "</table>";
     }
@@ -1054,6 +1108,7 @@ func generateListPageHTML() string {
         }
 
         localStorage.setItem(PASSWORD_STORAGE_KEY, password);
+        currentPassword = password;
         authEl.style.display = "none";
         const count = Number(data.count || 0);
         statusEl.textContent = "共 " + count + " 条记录";
@@ -1063,6 +1118,43 @@ func generateListPageHTML() string {
         authErrorEl.textContent = error && error.message ? error.message : "密码错误或网络异常";
       } finally {
         submitBtnEl.disabled = false;
+      }
+    }
+
+    async function deleteShare(id, buttonEl) {
+      if (!currentPassword) {
+        authErrorEl.textContent = "密码不存在，请重新输入";
+        authEl.style.display = "flex";
+        return;
+      }
+      if (!window.confirm("确认删除该分享记录？删除后不可恢复。")) {
+        return;
+      }
+
+      const prevText = buttonEl.textContent;
+      buttonEl.disabled = true;
+      buttonEl.textContent = "删除中...";
+      authErrorEl.textContent = "";
+
+      try {
+        const response = await fetch("/api/share/" + encodeURIComponent(id), {
+          method: "DELETE",
+          headers: {
+            [PASSWORD_HEADER_KEY]: currentPassword
+          }
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "删除失败");
+        }
+
+        await loadList(currentPassword);
+      } catch (error) {
+        authErrorEl.textContent = error && error.message ? error.message : "删除失败";
+      } finally {
+        buttonEl.disabled = false;
+        buttonEl.textContent = prevText;
       }
     }
 
@@ -1079,6 +1171,18 @@ func generateListPageHTML() string {
       if (event.key === "Enter") {
         submitBtnEl.click();
       }
+    });
+
+    listWrapEl.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) {
+        return;
+      }
+      const id = target.getAttribute("data-id");
+      if (!id) {
+        return;
+      }
+      deleteShare(id, target);
     });
 
     const cachedPassword = localStorage.getItem(PASSWORD_STORAGE_KEY);

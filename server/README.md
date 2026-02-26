@@ -87,6 +87,22 @@ GET /api/share/{id}
 }
 ```
 
+### 删除分享（鉴权）
+
+```http
+DELETE /api/share/{id}
+X-List-Password: <密码>
+```
+
+成功响应：
+
+```json
+{
+  "id": "abc12345",
+  "message": "删除成功"
+}
+```
+
 ### 获取分享列表（鉴权）
 
 ```http
@@ -145,6 +161,7 @@ GET /list
 ```
 
 页面内输入一次密码后，会缓存在浏览器，并在后续请求中自动通过 `X-List-Password` 访问 `/api/shares`。
+列表中的每条记录都支持删除，删除时调用 `DELETE /api/share/{id}`，并复用同一个 Header 密码。
 
 ## 数据存储
 
