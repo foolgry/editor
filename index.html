@@ -26,6 +26,9 @@
   <!-- 代码高亮库 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/es/highlight.min.js"></script>
+  
+  <!-- Mermaid 图表库 -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 
   <!-- Turndown - HTML 转 Markdown 库 -->
   <script src="https://cdn.jsdelivr.net/npm/turndown@7.2.0/dist/turndown.js"></script>
@@ -565,6 +568,12 @@
     .preview-container.layout-mode img:hover {
       outline: 2px solid var(--color-accent);
       outline-offset: 2px;
+    }
+
+    .preview-container .mermaid svg {
+      max-width: 100%;
+      height: auto;
+      display: inline-block;
     }
 
     /* 图片控制面板 */

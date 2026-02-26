@@ -38,6 +38,8 @@
 - **样式收藏**：收藏常用样式，快速切换
 - **文件上传**：支持 .md / .markdown 文件
 - **代码高亮**：优雅的代码块展示，支持多种语言
+- **Mermaid 渲染**：预览区支持 Mermaid/Flowchart/Sequence 等图表语法
+- **引用角标清理**：自动过滤 `cite...` 等检索引用标记
 - **响应式设计**：完美适配桌面、平板、手机
 
 ## 📖 使用指南
@@ -103,6 +105,7 @@ python3 -m http.server 8080
 - **Vue 3** - 渐进式前端框架
 - **Markdown-it** - 强大的 Markdown 解析器
 - **Highlight.js** - 代码语法高亮
+- **Mermaid** - 图表语法渲染
 - **IndexedDB** - 本地图片持久化存储
 - **Canvas API** - 客户端图片压缩
 - **Turndown** - HTML 转 Markdown（智能粘贴）

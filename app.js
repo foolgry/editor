@@ -541,7 +541,8 @@ const editorApp = createApp({
       shareServerUrl: window.location.hostname === 'localhost' 
         ? 'http://localhost:8080' 
         : 'https://md.foolgry.top',  // 根据环境自动选择服务器地址
-      shareCopySuccess: false       // 分享链接复制成功状态
+      shareCopySuccess: false,      // 分享链接复制成功状态
+      mermaidInitialized: false     // Mermaid 是否已初始化
     };
   },
 
@@ -581,6 +582,12 @@ const editorApp = createApp({
       linkify: true,
       typographer: false,  // 禁用 typographer 以避免智能引号干扰加粗标记
       highlight: function (str, lang) {
+        // Mermaid 图表特殊处理
+        if (lang && ['mermaid', 'flowchart', 'graph', 'sequenceDiagram', 'gantt', 'classDiagram', 'stateDiagram', 'erDiagram', 'journey', 'pie', 'gitGraph', 'requirementDiagram'].includes(lang)) {
+          const mermaidSource = md.utils.escapeHtml(str);
+          return `<div class="mermaid" style="background: #fff; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; overflow-x: auto;">${mermaidSource}</div>`;
+        }
+
         // macOS 风格的窗口装饰
         const dots = '<div style="display: flex; align-items: center; gap: 6px; padding: 10px 12px; background: #2a2c33; border-bottom: 1px solid #1e1f24;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #ff5f56;"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #ffbd2e;"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #27c93f;"></span></div>';
 
@@ -808,9 +815,15 @@ const markdown = \`![图片](img://\${imageId})\`;
       html = this.applyInlineStyles(html);
 
       this.renderedContent = html;
+
+      // 等待 DOM 更新后渲染 Mermaid
+      await this.$nextTick();
+      this.renderMermaid();
     },
 
     preprocessMarkdown(content) {
+      content = this.stripCitationMarkers(content);
+
       // 规范化水平分割线格式（修复从飞书等复制时的解析问题）
       // 匹配 * * *、- - -、_ _ _ 等格式（包括带空格的变体）
       // 确保它们被正确解析为 <hr> 而非无序列表
@@ -840,6 +853,46 @@ const markdown = \`![图片](img://\${imageId})\`;
       content = content.replace(/^(\s*(?:\d+\.|-|\*)\s+.+?)\n\n\s+(.+?)$/gm, '$1 $2');
 
       return content;
+    },
+
+    stripCitationMarkers(content) {
+      // 过滤 OpenAI/检索链路残留的引用角标，如：citeturn9search6turn9search2
+      return content.replace(/\uE200cite\uE202[^\uE201]*\uE201/g, '');
+    },
+
+    renderMermaid() {
+      if (typeof mermaid === 'undefined') {
+        return;
+      }
+
+      try {
+        if (!this.mermaidInitialized) {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+              useMaxWidth: true,
+              htmlLabels: true,
+              curve: 'basis'
+            },
+            sequence: {
+              useMaxWidth: true,
+              wrap: true
+            },
+            gantt: {
+              useMaxWidth: true
+            }
+          });
+          this.mermaidInitialized = true;
+        }
+
+        mermaid.run({
+          querySelector: '.preview-container .mermaid'
+        });
+      } catch (error) {
+        console.error('Mermaid 渲染失败:', error);
+      }
     },
 
     // 处理 img:// 协议（从 IndexedDB 加载图片）
