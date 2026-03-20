@@ -44,6 +44,14 @@
 
 ## 🆕 最近更新
 
+### 2026-03-20
+- 将超大单文件 `app.js` 拆分为“基础模块 + 业务编排”结构
+- 新增 `modules/` 目录，抽离 `ImageStore`、`ImageCompressor`、`ImageHostManager`、Markdown 文本工具
+- 继续将 `methods` 全量抽离到 `modules/editor-methods.js`，`app.js` 只保留应用骨架
+- `app.js` 仅保留 Vue 应用编排逻辑，避免基础能力与业务逻辑混在一个文件
+- `index.html` 更新脚本加载顺序，确保模块先加载再初始化应用
+- 修复模块加载失败导致 Vue 未挂载（页面出现 `{{ ... }}` 原样文本）的问题，改为容错降级
+
 ### 2026-03-19
 - 修复主页预览中有序列表项 `1. **标题**：内容` 的加粗渲染问题
 - 移除会干扰 Markdown 强调闭合判定的零宽字符注入预处理逻辑
@@ -134,8 +142,14 @@ python3 -m http.server 8080
 ```
 公众号编辑器/
 ├── index.html        # 主页面
-├── app.js           # Vue 应用逻辑
+├── app.js            # Vue 应用编排逻辑（已瘦身）
 ├── styles.js        # 13 种样式主题配置
+├── modules/         # 基础能力模块（图片/文本工具）
+│   ├── image-store.js
+│   ├── image-compressor.js
+│   ├── image-host-manager.js
+│   ├── text-utils.js
+│   └── editor-methods.js
 ├── icon.svg         # 项目图标
 ├── favicon.svg      # 网站图标
 ├── logo.svg         # Logo 图标
@@ -143,8 +157,8 @@ python3 -m http.server 8080
 ├── README.md        # 项目说明
 ├── CLAUDE.md        # 技术文档
 ├── SHARE_FEATURE.md # 分享功能说明
-└── LICENSE          # 开源许可证
-├── server/          # Go 后端服务（分享功能）
+├── LICENSE          # 开源许可证
+└── server/          # Go 后端服务（分享功能）
 │   ├── main.go      # 主程序
 │   ├── go.mod       # Go 模块配置
 │   ├── Dockerfile   # Docker 配置
