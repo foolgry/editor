@@ -1,551 +1,283 @@
-# 公众号 Markdown 编辑器 - 部署文档
+# 部署指南
 
-## 📋 目录
-
-- [架构概览](#架构概览)
-- [快速开始](#快速开始)
-- [部署脚本使用](#部署脚本使用)
-- [服务器管理](#服务器管理)
-- [手动部署](#手动部署)
-- [常见问题](#常见问题)
-- [备份与恢复](#备份与恢复)
-
----
-
-## 架构概览
-
-### 部署架构
+## 整体架构
 
 ```
-用户请求
+用户浏览器
     ↓
-Nginx (80/443) + SSL
-    ├── md.foolgry.top/          → 导航页（公开）
-    ├── /s/* /api/* /list        → Go 后端（公开）
-    └── admin.md.foolgry.top/*   → 编辑器（需认证）
+Nginx (80/443)
+    ├── /               → 前端静态文件（编辑器）
+    ├── /s/*             → 分享页面（后端渲染）
+    ├── /api/*           → API 接口
+    └── /list            → 分享管理页
             ↓
-    Docker: huasheng-editor-backend (127.0.0.1:3000)
+    Docker: Go 后端 (127.0.0.1:3000)
             ↓
-    SQLite: /opt/huasheng-editor/server/data/shares.db
+    SQLite: shares.db
 ```
 
-### 服务器目录结构
+前端是纯静态文件（HTML/JS/CSS），不需要构建。后端是 Go 服务，负责分享功能的数据存储和页面渲染。如果不使用分享功能，只需部署前端即可。仓库内自带 `docker-compose.yml`，部署脚本会自动同步并在服务器执行。
+
+## 服务器要求
+
+- Linux 服务器（Ubuntu 20.04+ / Debian 11+ / CentOS 8+）
+- 至少 1GB 内存
+- Docker + Docker Compose
+- Nginx
+- 一个域名（可选，用于 HTTPS）
+
+## 部署步骤
+
+### 第 1 步：配置 DNS
+
+将你的域名 A 记录指向服务器 IP：
 
 ```
-/opt/huasheng-editor/
-├── docker-compose.yml       # Docker 编排配置
-├── server/                  # Go 后端
-│   ├── Dockerfile          # 镜像构建文件
-│   ├── main.go             # 后端源码
-│   ├── go.mod              # Go 依赖
-│   └── data/
-│       └── shares.db       # SQLite 数据库
-├── frontend/               # 前端静态文件
-│   ├── index.html          # 导航页
-│   ├── editor.html         # 编辑器页面
-│   ├── app.js              # Vue 应用
-│   ├── styles.js           # 主题样式
-│   └── ...
-├── nginx/                  # Nginx 配置（新增）
-│   └── md-editor.conf      # 站点配置文件
-│   └── .htpasswd           # 密码文件
-└── backup/                 # 备份目录
-    └── 20250217_232042/    # 按时间戳备份
+类型    名称          值
+A      editor       你的服务器IP
 ```
 
-### 访问地址
+例如你要用 `md.example.com` 访问编辑器，就添加一条 `md` 的 A 记录。
 
-| 地址 | 说明 | 访问权限 |
-|------|------|----------|
-| https://md.foolgry.top | 导航页 | 公开 |
-| https://admin.md.foolgry.top | 编辑器 | 需密码认证 |
-| https://md.foolgry.top/s/{id} | 分享页面 | 公开 |
-| https://md.foolgry.top/list | 分享管理列表页 | 需页面密码 |
-
-**登录信息：**
-- 用户名：`foolgry`
-- 密码：`z46QTefWWy7fb`
-
----
-
-## 快速开始
-
-### 1. 环境要求
-
-- 服务器已配置 SSH 密钥登录（别名 `hsy`）
-- 服务器已安装 Docker 和 Docker Compose
-- 服务器已安装 Nginx
-- 域名已指向服务器 IP
-
-### 2. 本地准备
-
-确保项目目录结构：
-
-```
-huasheng_editor/
-├── index.html          # 编辑器页面（会被重命名为 editor.html）
-├── app.js              # Vue 应用逻辑
-├── styles.js           # 样式配置
-├── server/             # Go 后端代码
-│   ├── main.go
-│   ├── go.mod
-│   └── Dockerfile
-├── nginx/              # Nginx 配置
-│   └── md-editor.conf  # 站点配置文件
-└── deploy.sh           # 部署脚本
-```
-
-### 3. 一键部署
+等 DNS 生效后验证：
 
 ```bash
-# 进入项目目录
-cd /Users/wangzhi/project/2026-02-17-alchaincyf-huasheng_editor
+ping md.example.com
+# 应该返回你的服务器 IP
+```
 
-# 执行部署
+### 第 2 步：准备服务器
+
+```bash
+# SSH 登录服务器
+ssh root@你的服务器IP
+
+# 安装 Docker
+curl -fsSL https://get.docker.com | sh
+systemctl enable docker && systemctl start docker
+
+# 安装 Nginx
+apt install -y nginx
+
+# 安装 certbot（用于 SSL 证书）
+apt install -y certbot python3-certbot-nginx
+```
+
+### 第 3 步：配置 SSH 免密登录（推荐）
+
+在你的本地电脑上操作，这样 deploy.sh 可以自动部署：
+
+```bash
+# 生成密钥（如果还没有的话）
+ssh-keygen -t ed25519
+
+# 复制公钥到服务器
+ssh-copy-id root@你的服务器IP
+
+# 测试免密登录
+ssh root@你的服务器IP
+# 应该不需要输入密码就能登录
+```
+
+然后在 `~/.ssh/config` 中添加别名：
+
+```
+Host my-editor-server
+    HostName 你的服务器IP
+    User root
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+测试：`ssh my-editor-server` 能直接登录即可。
+
+### 第 4 步：克隆项目并配置
+
+```bash
+# 在本地电脑操作
+git clone https://github.com/foolgry/editor.git
+cd editor
+
+# 复制配置模板
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填入你的实际配置：
+
+```env
+# ========== 部署配置 ==========
+
+# SSH 别名（对应 ~/.ssh/config 中的 Host）或直接用服务器 IP
+REMOTE_HOST=my-editor-server
+
+# 服务器上的部署目录，前端和后端代码会同步到这里
+REMOTE_DIR=/opt/md-editor
+
+# 你的域名（不带 https://）
+PUBLIC_DOMAIN=md.example.com
+
+# 完整访问地址（带 https://）
+PUBLIC_URL=https://md.example.com
+
+# ========== 后端配置 ==========
+
+# 分享管理列表的访问密码，自己设一个强密码
+# 访问 /list 时需要输入这个密码
+LIST_PAGE_PASSWORD=your-secure-password
+
+# 允许跨域请求的来源地址，逗号分隔
+# 必须包含你的前端域名，否则分享功能无法使用
+CORS_ORIGINS=https://md.example.com,http://localhost:8080
+
+# ========== Nginx 配置 ==========
+
+# SSL 证书路径（Let's Encrypt 默认路径格式）
+# 第 6 步申请证书后会自动创建
+SSL_CERT_PATH=/etc/letsencrypt/live/md.example.com
+```
+
+每个变量说明：
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `REMOTE_HOST` | 是 | deploy.sh 通过 SSH 连接服务器用的地址。可以是 SSH config 中的别名，也可以是 `root@1.2.3.4` |
+| `REMOTE_DIR` | 是 | 服务器上存放项目的目录，不需要提前创建 |
+| `PUBLIC_DOMAIN` | 是 | 你的域名，Nginx 配置和 SSL 证书都会用到 |
+| `PUBLIC_URL` | 是 | 带协议的完整地址，用于部署后验证 |
+| `LIST_PAGE_PASSWORD` | 是 | 后端启动必需。用于保护 `/list` 和删除接口 |
+| `CORS_ORIGINS` | 是 | 跨域白名单，需要包含前端访问地址。本地开发加上 `http://localhost:8080` |
+| `SSL_CERT_PATH` | 否 | HTTPS 证书路径。不用 HTTPS 则不需要 |
+
+### 第 5 步：申请 SSL 证书
+
+在服务器上操作：
+
+```bash
+# 确保域名 DNS 已经生效
+ping md.example.com
+
+# 申请 Let's Encrypt 免费证书
+# --nginx 会自动配置 Nginx，但我们只需要证书，手动配置 Nginx
+certbot certonly --nginx -d md.example.com
+
+# 证书会保存在 /etc/letsencrypt/live/md.example.com/
+# 自动续期已内置，无需额外配置
+```
+
+如果暂时不需要 HTTPS，可以跳过这步，并将：
+
+- `SSL_CERT_PATH` 留空
+- `PUBLIC_URL` 改成 `http://你的域名`
+
+`deploy.sh nginx` 会自动生成纯 HTTP 的 Nginx 配置（不做 80→443 跳转）。
+
+### 第 6 步：一键部署
+
+回到本地电脑：
+
+```bash
+chmod +x deploy.sh
+
+# 完整部署（前端 + 后端 + Nginx 配置）
 ./deploy.sh
+
+# 也可以只部署某个部分
+./deploy.sh frontend   # 仅前端
+./deploy.sh backend    # 仅后端
+./deploy.sh nginx      # 仅 Nginx 配置
+./deploy.sh verify     # 验证部署状态
+./deploy.sh backup     # 备份服务器代码
 ```
 
-部署完成后访问：
-- 主页：https://md.foolgry.top
-- 编辑器：https://admin.md.foolgry.top
+部署完成后访问你配置的 `PUBLIC_URL`，应该能看到编辑器页面。
 
----
-
-## 部署脚本使用
-
-### 本地部署脚本 (`deploy.sh`)
-
-位于项目根目录，用于从本地快速部署到服务器。
-
-#### 使用方法
+### 第 7 步：验证
 
 ```bash
-./deploy.sh [选项]
+# 检查前端
+curl -I http://md.example.com
+# 应返回 200
+
+# 检查后端
+curl -I http://md.example.com/api/share
+# 应返回 405（Method Not Allowed，说明后端在运行）
+
+# 检查分享页面
+curl -I http://md.example.com/s/test
+# 应返回 404（说明路由正常）
 ```
 
-#### 选项说明
+如果你启用了 HTTPS，把上面 `http://` 改成 `https://`。
 
-| 选项 | 说明 |
-|------|------|
-| `all` (默认) | 完整部署（前端+后端+Nginx） |
-| `frontend` | 仅部署前端 |
-| `backend` | 仅部署后端 |
-| `nginx` | 仅部署 Nginx 配置 |
-| `verify` | 仅验证部署状态 |
-| `backup` | 仅备份远程代码 |
-| `help` | 显示帮助 |
+## 不用分享功能
 
-#### 使用示例
+如果只用前端编辑器，不需要后端：
 
-**完整部署（更新前后端）：**
-```bash
-./deploy.sh
-```
+1. 把前端文件放到任何 HTTP 服务器即可（Nginx、GitHub Pages、Vercel 等）
+2. 不需要 `.env`、Docker、Go 后端
+3. 编辑器所有功能（编辑、预览、复制、图片处理）都是纯前端，离线可用
 
-**只更新前端（修改了 HTML/JS/CSS）：**
-```bash
-./deploy.sh frontend
-```
+## 不用 Nginx（纯 Docker）
 
-**只更新后端（修改了 Go 代码）：**
-```bash
-./deploy.sh backend
-```
-
-**只更新 Nginx 配置：**
-```bash
-./deploy.sh nginx
-```
-
-**查看部署状态：**
-```bash
-./deploy.sh verify
-```
-
-#### 部署流程
-
-1. **检查 SSH 连接** - 确保能连接到服务器
-2. **备份远程代码** - 自动备份到 `backup/时间戳/` 目录
-3. **同步文件** - 使用 rsync 只传输变更文件
-4. **构建容器** - 重新构建 Docker 容器（后端）
-5. **验证部署** - 检查服务是否正常
-
-#### 输出示例
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  公众号 Markdown 编辑器 - 部署脚本
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[INFO] 检查 SSH 连接...
-[SUCCESS] SSH 连接正常
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  1. 备份远程代码
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-前端代码已备份
-后端代码已备份
-[SUCCESS] 备份完成: /opt/huasheng-editor/backup/20250217_232042
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  2. 部署前端代码
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[INFO] 同步前端文件到服务器...
-... 传输文件列表 ...
-[SUCCESS] 前端部署完成
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  3. 部署后端代码
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[INFO] 重新构建 Docker 容器...
-... 构建日志 ...
-[SUCCESS] 后端部署完成
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  4. 验证部署
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[SUCCESS] 后端服务运行正常
-[SUCCESS] 前端访问正常
-[SUCCESS] 编辑器认证正常
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  部署完成！
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
----
-
-## 服务器管理
-
-### 服务器管理脚本 (`md-manage`)
-
-位于服务器的 `/usr/local/bin/md-manage`，用于服务器端日常维护。
-
-#### 使用方法
+如果不想配置 Nginx，可以直接用 Docker 运行：
 
 ```bash
-ssh hsy                    # 登录服务器
-md-manage [命令]
+# 本地运行
+./start.sh
+
+# 或用 Docker（需要同时挂载 frontend 目录）
+cd server
+docker build -t md-editor .
+docker run -d -p 8080:8080 \
+  --env-file ../.env \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/../frontend:/app/frontend:ro \
+  md-editor
+
+# 访问 http://localhost:8080
 ```
 
-#### 命令列表
+Go 服务同时提供前端页面和后端 API，不需要额外启动其他服务。
 
-| 命令 | 说明 |
-|------|------|
-| `start` | 启动服务 |
-| `stop` | 停止服务 |
-| `restart` | 重启服务 |
-| `rebuild` | 重新构建并启动 |
-| `logs` | 查看实时日志 |
-| `status` | 查看服务状态 |
-| `reload-nginx` | 重载 Nginx 配置 |
-| `update-password` | 修改登录密码 |
+## Nginx 模板说明
 
-#### 使用示例
+`nginx/md-editor.conf` 是模板文件，使用 `{{占位符}}` 标记需要替换的值：
 
-**查看服务状态：**
-```bash
-ssh hsy md-manage status
-```
+- `{{PUBLIC_DOMAIN}}` → 你的域名
+- `{{SSL_CERT_PATH}}` → SSL 证书路径
+- `{{REMOTE_DIR}}` → 部署目录
 
-**查看实时日志：**
-```bash
-ssh hsy md-manage logs
-```
-
-**重启服务：**
-```bash
-ssh hsy md-manage restart
-```
-
-**修改密码：**
-```bash
-ssh hsy md-manage update-password
-# 输入新密码（不显示）
-# ✅ 密码已更新
-```
-
-**重载 Nginx（修改配置后）：**
-```bash
-ssh hsy md-manage reload-nginx
-```
-
----
-
-## 手动部署
-
-如果脚本部署失败，可以手动部署。
-
-### 1. 部署前端
-
-```bash
-# 本地执行
-rsync -avz --exclude='.git' --exclude='server' \
-  ./ hsy:/opt/huasheng-editor/frontend/
-
-# 服务器执行（确保导航页正确）
-ssh hsy "
-  cd /opt/huasheng-editor/frontend
-  # 如果 index.html 是编辑器（文件很大），重命名为 editor.html
-  if [ $(stat -f%z index.html) -gt 50000 ]; then
-    mv index.html editor.html
-  fi
-  # 设置权限
-  chown -R www-data:www-data /opt/huasheng-editor/frontend/
-"
-```
-
-### 2. 部署后端
-
-```bash
-# 同步后端代码
-rsync -avz ./server/ hsy:/opt/huasheng-editor/server/
-
-# 服务器执行
-ssh hsy "
-  cd /opt/huasheng-editor
-  docker compose down
-  docker compose up -d --build
-"
-```
-
-### 3. 更新 Nginx 配置
-
-配置文件位置：`/etc/nginx/sites-available/md-editor`
-
-#### 方法 A：本地修改后同步（推荐）
-
-```bash
-# 1. 首次拉取服务器配置到本地
-mkdir -p nginx
-scp hsy:/etc/nginx/sites-available/md-editor nginx/md-editor.conf
-
-# 2. 本地修改 nginx/md-editor.conf
-# ... 编辑文件 ...
-
-# 3. 同步到服务器
-scp nginx/md-editor.conf hsy:/etc/nginx/sites-available/md-editor
-
-# 4. 测试并重载
-ssh hsy "nginx -t && nginx -s reload"
-```
-
-#### 方法 B：直接在服务器修改
-
-```bash
-ssh hsy "nano /etc/nginx/sites-available/md-editor"
-ssh hsy "nginx -t && nginx -s reload"
-```
-
-#### 配置备份
-
-每次部署脚本会自动备份 Nginx 配置：
-```
-backup/
-└── 20250218_003405/
-    ├── frontend/          # 前端代码备份
-    ├── server/            # 后端代码备份
-    └── nginx.conf         # Nginx 配置备份
-```
-
----
+deploy.sh 部署时会自动从 `.env` 读取并替换。如果 `SSL_CERT_PATH` 为空，deploy.sh 会生成纯 HTTP 配置；如果不为空，会使用该模板生成 HTTPS 配置。
 
 ## 常见问题
 
-### Q1: 部署后访问 500 错误
-
-**原因：** Nginx 配置错误或密码文件权限问题
-
-**解决：**
-```bash
-# 检查 Nginx 配置
-ssh hsy "nginx -t"
-
-# 检查密码文件权限
-ssh hsy "ls -la /etc/nginx/.htpasswd"
-
-# 修复权限
-ssh hsy "chmod 644 /etc/nginx/.htpasswd"
-```
-
-### Q2: 浏览器不弹出密码框
-
-**原因：** 浏览器缓存了之前的认证状态
-
-**解决：**
-1. 使用无痕模式测试（Ctrl+Shift+N）
-2. 或修改密码强制失效：`md-manage update-password`
-3. 或清除站点数据：Chrome 设置 → 隐私 → 清除浏览数据 → 选择「Cookie」
-
-### Q3: 后端服务无法启动
-
-**原因：** Docker 构建失败或端口占用
-
-**解决：**
-```bash
-# 查看日志
-ssh hsy md-manage logs
-
-# 手动重启
-ssh hsy md-manage rebuild
-
-# 检查端口
-ssh hsy "ss -tlnp | grep 3000"
-```
-
-### Q4: 分享链接无法访问
-
-**原因：** 后端服务异常或数据库错误
-
-**解决：**
-```bash
-# 检查后端状态
-ssh hsy "docker compose -f /opt/huasheng-editor/docker-compose.yml ps"
-
-# 检查数据库
-ssh hsy "sqlite3 /opt/huasheng-editor/server/data/shares.db '.tables'"
-
-# 重启后端
-ssh hsy md-manage restart
-```
-
-### Q5: 如何修改域名
-
-1. 修改 Nginx 配置中的 `server_name`
-2. 申请新域名的 SSL 证书
-3. 重载 Nginx
+### 后端启动失败
 
 ```bash
-ssh hsy "
-  certbot certonly --nginx -d 新域名
-  nginx -s reload
-"
+# 查看容器日志
+ssh 你的服务器 'docker compose -f /opt/md-editor/docker-compose.yml logs'
+
+# 检查端口占用
+ssh 你的服务器 'ss -tlnp | grep 3000'
+
+# 检查 .env 是否已传到服务器
+ssh 你的服务器 'cat /opt/md-editor/.env'
 ```
 
----
+### 前端无法使用分享功能
 
-## 备份与恢复
+1. 检查 Nginx 是否正确代理了 `/api/` 和 `/s/` 路径
+2. 检查 `CORS_ORIGINS` 是否包含前端域名
+3. 打开浏览器开发者工具 → Network 查看请求状态
 
-### 自动备份
-
-每次部署脚本会自动备份远程代码到：`/opt/huasheng-editor/backup/时间戳/`
-
-### 手动备份
+### SSL 证书问题
 
 ```bash
-# 备份整个项目
-ssh hsy "
-  cd /opt
-  tar czf ~/huasheng-editor-backup-$(date +%Y%m%d).tar.gz huasheng-editor/
-"
+# 检查证书是否过期
+ssh 你的服务器 'certbot certificates'
 
-# 下载到本地
-scp hsy:~/huasheng-editor-backup-*.tar.gz ./
+# 手动续期
+ssh 你的服务器 'certbot renew'
+
+# 检查 Nginx 配置中的证书路径是否正确
+ssh 你的服务器 'nginx -t'
 ```
-
-### 恢复备份
-
-```bash
-# 从备份恢复
-ssh hsy "
-  cd /opt/huasheng-editor
-  cp backup/20250217_232042/frontend/app.js frontend/
-  # 重启服务
-  md-manage restart
-"
-```
-
-### 数据库备份
-
-```bash
-# 备份 SQLite 数据库
-ssh hsy "cp /opt/huasheng-editor/server/data/shares.db ~/shares-backup.db"
-
-# 下载到本地
-scp hsy:~/shares-backup.db ./
-```
-
----
-
-## 更新流程示例
-
-### 场景 1：修改了编辑器功能（前端）
-
-```bash
-# 1. 本地修改代码（app.js / index.html 等）
-
-# 2. 测试无误后，执行部署
-cd /Users/wangzhi/project/2026-02-17-alchaincyf-huasheng_editor
-./deploy.sh frontend
-
-# 3. 部署完成后，访问 https://admin.md.foolgry.top 验证
-```
-
-### 场景 2：修改了分享功能（后端）
-
-```bash
-# 1. 本地修改 Go 代码（server/main.go）
-
-# 2. 本地测试构建
-cd server
-go build -o test-server main.go
-
-# 3. 部署到服务器
-cd ..
-./deploy.sh backend
-
-# 4. 验证分享功能是否正常
-```
-
-### 场景 3：完整更新
-
-```bash
-# 1. 更新前后端代码
-# 2. 完整部署
-./deploy.sh
-
-# 3. 验证所有功能
-# - 主页访问
-# - 编辑器登录
-# - 分享功能
-# - 分享页面查看
-```
-
----
-
-## 安全建议
-
-1. **定期修改密码**
-   ```bash
-   ssh hsy md-manage update-password
-   ```
-
-2. **定期备份数据**
-   ```bash
-   # 数据库备份
-   ssh hsy "cp /opt/huasheng-editor/server/data/shares.db ~/backup-$(date +%Y%m%d).db"
-   ```
-
-3. **保持系统更新**
-   ```bash
-   ssh hsy "apt update && apt upgrade -y"
-   ```
-
-4. **监控日志**
-   ```bash
-   ssh hsy md-manage logs
-   ```
-
----
-
-## 联系支持
-
-如有问题，请检查：
-1. 服务器状态：`ssh hsy md-manage status`
-2. Nginx 日志：`ssh hsy "tail -20 /var/log/nginx/error.log"`
-3. 后端日志：`ssh hsy md-manage logs`
-
----
-
-**文档版本：** v1.0  
-**最后更新：** 2025-02-17
