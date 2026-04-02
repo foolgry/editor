@@ -146,7 +146,8 @@ const STYLES = {
   },
 
   'wechat-elegant': {
-    name: '优雅简约',
+    name: '优雅简约（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 720px; margin: 0 auto; padding: 12px 20px 30px 20px; font-family: "Songti SC", "SimSun", Georgia, serif; font-size: 17px; line-height: 1.85 !important; color: #333 !important; background-color: #fff !important; word-wrap: break-word;',
       h1: 'font-size: 26px; font-weight: 400; color: #1a1a1a !important; line-height: 1.4 !important; margin: 36px 0 18px; text-align: center; letter-spacing: 2px;',
@@ -233,7 +234,8 @@ const STYLES = {
   },
 
   'wechat-jonyive': {
-    name: 'Jony Ive',
+    name: 'Jony Ive（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 620px; margin: 0 auto; padding: 16px 24px 40px 24px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif; font-size: 17px; line-height: 1.6 !important; color: #6e6e73 !important; background-color: #fbfbfd !important; word-wrap: break-word;',
       h1: 'font-size: 39px; font-weight: 200; color: #1d1d1f !important; line-height: 1.15 !important; margin: 48px 0 24px; letter-spacing: -0.025em;',
@@ -291,7 +293,8 @@ const STYLES = {
   },
 
   'wechat-apple': {
-    name: 'Apple 极简',
+    name: 'Apple 极简（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 640px; margin: 0 auto; padding: 20px 12px 40px 12px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif; font-size: 17px; line-height: 1.65 !important; color: #86868b !important; background-color: #fbfbfd !important; word-wrap: break-word;',
       h1: 'font-size: 32px; font-weight: 600; color: #1d1d1f !important; line-height: 1.15 !important; margin: 36px 0 18px; letter-spacing: -0.015em;',
@@ -321,7 +324,8 @@ const STYLES = {
 
   // === 原研哉设计 ===
   'kenya-emptiness': {
-    name: '原研哉·空',
+    name: '原研哉·空（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 640px; margin: 0 auto; padding: 28px 24px 80px 24px; font-family: "Hiragino Sans", "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 16px; line-height: 2.5 !important; color: #333 !important; background-color: #fff !important; word-wrap: break-word;',
       h1: 'font-size: 24px; font-weight: 300; color: #000 !important; line-height: 2 !important; margin: 80px 0 60px; letter-spacing: 0.5em; text-align: center; padding: 0;',
@@ -350,7 +354,8 @@ const STYLES = {
   },
 
   'hische-editorial': {
-    name: 'Hische·编辑部',
+    name: 'Hische·编辑部（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 700px; margin: 0 auto; padding: 20px 20px 50px 20px; font-family: "Crimson Text", Garamond, serif; font-size: 17px; line-height: 1.75 !important; color: #2c2c2c !important; background-color: #fffef9 !important; word-wrap: break-word;',
       h1: 'font-size: 32px; font-weight: 400; color: #c9302c !important; line-height: 1.2 !important; margin: 36px 0 18px; letter-spacing: -0.02em; font-family: "Bodoni MT", "Didot", serif; text-align: center;',
@@ -380,7 +385,8 @@ const STYLES = {
 
   // === 建筑大师跨界设计 ===
   'ando-concrete': {
-    name: '安藤·清水',
+    name: '安藤·清水（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 600px; margin: 0 auto; padding: 20px 24px 50px 24px; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 16px; line-height: 1.85 !important; color: #4a4a4a !important; background-color: #fff !important; word-wrap: break-word;',
       h1: 'font-size: 24px; font-weight: 300; color: #1a1a1a !important; line-height: 1.35 !important; margin: 36px 0 20px; padding-bottom: 16px; border-bottom: 1px solid #d0d0d0; letter-spacing: 0.15em; text-transform: uppercase;',
@@ -409,7 +415,8 @@ const STYLES = {
   },
 
   'gaudi-organic': {
-    name: '高迪·有机',
+    name: '高迪·有机（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 700px; margin: 0 auto; padding: 20px 24px 45px 24px; font-family: "Baskerville", "Georgia", serif; font-size: 17px; line-height: 1.8 !important; color: #3d2914 !important; background-color: #fff5e6 !important; word-wrap: break-word;',
       h1: 'font-size: 32px; font-weight: 700; color: #ff6b6b !important; background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bcf7f, #4ecdc4, #5b86e5, #a55eea); -webkit-background-clip: text; background-clip: text; line-height: 1.25 !important; margin: 36px 0 18px; text-align: center; letter-spacing: -0.02em; position: relative; padding: 12px;',
@@ -497,7 +504,8 @@ const STYLES = {
   },
 
   'lemonde': {
-    name: 'Le Monde 世界报',
+    name: 'Le Monde 世界报（隐藏）',
+    hidden: true,
     styles: {
       container: 'max-width: 680px; margin: 0 auto; padding: 20px 20px 45px 20px; font-family: Georgia, "Times New Roman", serif; font-size: 17px; line-height: 1.8 !important; color: #2c2c2c !important; background-color: #fffef9 !important; word-wrap: break-word;',
       h1: 'font-size: 32px; font-weight: 400; color: #1a1a1a !important; line-height: 1.2 !important; margin: 36px 0 18px; text-align: center; letter-spacing: -0.02em; font-family: "Didot", Georgia, serif; text-transform: uppercase;',

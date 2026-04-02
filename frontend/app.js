@@ -169,6 +169,20 @@ const editorApp = createApp({
     });
   },
 
+  computed: {
+    visibleStyles() {
+      return Object.fromEntries(
+        Object.entries(this.STYLES).filter(([, style]) => !style.hidden)
+      );
+    },
+    visibleStarredStyles() {
+      return this.starredStyles.filter((styleKey) => {
+        const style = this.STYLES[styleKey];
+        return style && !style.hidden;
+      });
+    }
+  },
+
   watch: {
     currentStyle() {
       if (this.md) {
