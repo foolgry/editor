@@ -1,0 +1,14 @@
+services:
+  backend:
+    container_name: md-editor-backend
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:8080"
+    env_file:
+      - ./.env
+    volumes:
+      - ./server/data:/app/data
+      - ./frontend:/app/frontend:ro

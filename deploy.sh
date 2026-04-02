@@ -6,10 +6,27 @@
 
 set -e  # 遇到错误立即退出
 
-# 配置
-REMOTE_HOST="hsy"
-REMOTE_DIR="/opt/huasheng-editor"
-LOCAL_DIR="$(cd "$(dirname "$0")" && pwd)"
+# 从 .env 文件加载配置
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    source "$SCRIPT_DIR/.env"
+else
+    echo "错误: 未找到 .env 配置文件"
+    echo "请复制 .env.example 为 .env 并填写你的配置"
+    exit 1
+fi
+
+LOCAL_DIR="$SCRIPT_DIR"
+
+# 检查关键环境变量
+require_env() {
+    local var_name="$1"
+    local value="${!var_name:-}"
+    if [ -z "$value" ]; then
+        print_error "环境变量 $var_name 未设置，请检查 .env"
+        exit 1
+    fi
+}
 
 # 颜色输出
 RED='\033[0;31m'
@@ -41,6 +58,10 @@ print_title() {
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 }
 
+require_env "REMOTE_HOST"
+require_env "REMOTE_DIR"
+require_env "PUBLIC_URL"
+
 # 检查 SSH 连接
 check_connection() {
     print_info "检查 SSH 连接..."
@@ -49,7 +70,7 @@ check_connection() {
         print_info "请确保:"
         print_info "  1. SSH 服务正在运行"
         print_info "  2. 已配置 SSH 密钥"
-        print_info "  3. ~/.ssh/config 中配置了 hsy 别名"
+        print_info "  3. ~/.ssh/config 中配置了 $REMOTE_HOST 别名"
         exit 1
     fi
     print_success "SSH 连接正常"
@@ -85,174 +106,92 @@ backup_remote() {
 # 部署前端代码
 deploy_frontend() {
     print_title "2. 部署前端代码"
-    
+
     print_info "同步前端文件到服务器..."
-    
-    # 使用 rsync 同步（排除不需要的文件）
+
+    # 使用 rsync 同步前端文件
     rsync -avz --progress \
-        --exclude='.git' \
-        --exclude='node_modules' \
         --exclude='.DS_Store' \
-        --exclude='server' \
-        --exclude='*.md' \
-        --exclude='deploy.sh' \
-        "$LOCAL_DIR/" "$REMOTE_HOST:$REMOTE_DIR/frontend/"
-    
-    # 确保导航页是 index.html，编辑器是 editor.html
+        "$LOCAL_DIR/frontend/" "$REMOTE_HOST:$REMOTE_DIR/frontend/"
+
+    # 设置权限
     ssh "$REMOTE_HOST" "
-        cd $REMOTE_DIR/frontend
-        
-        # 从 index.html 复制 editor.html（admin.md.foolgry.top 需要）
-        if [ -f index.html ]; then
-            cp index.html editor.html
-            echo '编辑器页面已复制为 editor.html'
-        fi
-        
-        # 如果 index.html 不存在或太小（被覆盖/损坏），重新创建导航页
-        if [ ! -f index.html ] || [ \$(stat -f%z index.html 2>/dev/null || stat -c%s index.html) -lt 10000 ]; then
-            cat > index.html << 'NAVEOF'
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>公众号 Markdown 编辑器 - 分享服务</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-            max-width: 600px;
-        }
-        .logo {
-            width: 80px;
-            height: 80px;
-            background: #fff;
-            border-radius: 20px;
-            margin: 0 auto 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        h1 {
-            font-size: 32px;
-            margin-bottom: 16px;
-            font-weight: 600;
-        }
-        p {
-            font-size: 18px;
-            opacity: 0.9;
-            margin-bottom: 40px;
-            line-height: 1.6;
-        }
-        .btn {
-            display: inline-block;
-            padding: 16px 32px;
-            background: #fff;
-            color: #667eea;
-            text-decoration: none;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 16px;
-            margin: 10px;
-            transition: transform 0.3s, box-shadow 0.3s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-        .btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-        }
-        .btn-secondary {
-            background: transparent;
-            color: #fff;
-            border: 2px solid #fff;
-        }
-        .footer {
-            margin-top: 60px;
-            font-size: 14px;
-            opacity: 0.7;
-        }
-        @media (max-width: 600px) {
-            h1 { font-size: 24px; }
-            p { font-size: 16px; }
-            .btn { display: block; margin: 10px 0; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="logo">📝</div>
-        <h1>公众号 Markdown 编辑器</h1>
-        <p>专业的公众号排版工具，支持多种精美主题样式</p>
-        <a href="https://admin.md.foolgry.top" class="btn">✏️ 开始创作</a>
-        <a href="https://github.com/alchaincyf/huasheng_editor" class="btn btn-secondary" target="_blank">📖 查看文档</a>
-        <div class="footer">
-            Created by 花生 · 分享美好内容
-        </div>
-    </div>
-</body>
-</html>
-NAVEOF
-            echo '导航页已创建'
-        fi
-        
-        # 设置权限
         chown -R www-data:www-data $REMOTE_DIR/frontend/ 2>/dev/null || chown -R root:root $REMOTE_DIR/frontend/
         chmod -R 644 $REMOTE_DIR/frontend/*.html $REMOTE_DIR/frontend/*.js $REMOTE_DIR/frontend/*.css 2>/dev/null || true
     "
-    
+
     print_success "前端部署完成"
 }
 
 # 部署后端代码
 deploy_backend() {
     print_title "3. 部署后端代码"
-    
+
     # 检查本地是否有 server 目录
     if [ ! -d "$LOCAL_DIR/server" ]; then
         print_warning "本地 server 目录不存在，跳过后端部署"
         return
     fi
-    
+
+    if [ ! -f "$LOCAL_DIR/docker-compose.yml" ]; then
+        print_error "缺少 docker-compose.yml，无法部署后端"
+        exit 1
+    fi
+
+    # 确保远端目录存在
+    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR $REMOTE_DIR/server $REMOTE_DIR/frontend"
+
     print_info "同步后端文件到服务器..."
-    
+
     # 同步 server 目录（保留 data 目录）
     rsync -avz --progress \
         --exclude='data' \
         --exclude='.git' \
         "$LOCAL_DIR/server/" "$REMOTE_HOST:$REMOTE_DIR/server/"
-    
+
+    # 同步前端静态文件到 frontend 目录
+    rsync -avz --progress \
+        --exclude='.DS_Store' \
+        "$LOCAL_DIR/frontend/" "$REMOTE_HOST:$REMOTE_DIR/frontend/"
+
+    # 同步 .env 文件到服务器（后端通过 env_file 加载）
+    scp "$LOCAL_DIR/.env" "$REMOTE_HOST:$REMOTE_DIR/.env"
+
+    # 同步 Docker Compose 配置
+    rsync -avz --progress \
+        "$LOCAL_DIR/docker-compose.yml" "$REMOTE_HOST:$REMOTE_DIR/docker-compose.yml"
+
     print_success "后端文件同步完成"
-    
+
     # 重新构建并启动容器
     print_info "重新构建 Docker 容器..."
     ssh "$REMOTE_HOST" "
+        set -e
         cd $REMOTE_DIR
-        
+
+        # 兼容 docker compose / docker-compose
+        if docker compose version >/dev/null 2>&1; then
+            DC='docker compose'
+        elif command -v docker-compose >/dev/null 2>&1; then
+            DC='docker-compose'
+        else
+            echo '错误: 未找到 docker compose 或 docker-compose'
+            exit 1
+        fi
+
         # 停止旧容器
-        docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true
-        
-        # 重新构建并启动
-        docker compose up -d --build 2>&1 | tail -20
-        
+        \$DC down 2>/dev/null || true
+
+        # 重新构建并启动（通过 env_file 加载 .env）
+        \$DC up -d --build 2>&1 | tail -20
+
         # 等待服务启动
         sleep 3
-        
+
         # 检查状态
-        docker compose ps
+        \$DC ps
     "
-    
+
     print_success "后端部署完成"
 }
 
@@ -260,37 +199,96 @@ deploy_backend() {
 deploy_nginx() {
     print_title "部署 Nginx 配置"
 
+    require_env "PUBLIC_DOMAIN"
+
     # 检查本地是否有 nginx 配置文件
     if [ ! -f "$LOCAL_DIR/nginx/md-editor.conf" ]; then
         print_warning "本地 nginx/md-editor.conf 不存在，跳过 Nginx 部署"
-        print_info "如需管理 Nginx 配置，请先从服务器拉取："
-        print_info "  mkdir -p nginx && scp $REMOTE_HOST:/etc/nginx/sites-available/md-editor nginx/"
         return
+    fi
+
+    print_info "从模板生成 Nginx 配置..."
+
+    rendered_conf="$(mktemp /tmp/md-editor.conf.XXXXXX)"
+
+    # 当 SSL_CERT_PATH 为空时，生成纯 HTTP 配置
+    if [ -z "${SSL_CERT_PATH:-}" ]; then
+        print_warning "SSL_CERT_PATH 为空，将生成纯 HTTP 配置（不启用 HTTPS）"
+        cat > "$rendered_conf" <<EOF
+server {
+    listen 80;
+    server_name ${PUBLIC_DOMAIN};
+
+    location / {
+        root ${REMOTE_DIR}/frontend;
+        index index.html;
+        try_files \$uri \$uri/ =404;
+    }
+
+    location ~ ^/(s|api)/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location = /list {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+    else
+        # 从模板生成 HTTPS 配置（替换占位符）
+        sed -e "s|{{PUBLIC_DOMAIN}}|${PUBLIC_DOMAIN}|g" \
+            -e "s|{{SSL_CERT_PATH}}|${SSL_CERT_PATH}|g" \
+            -e "s|{{REMOTE_DIR}}|${REMOTE_DIR}|g" \
+            "$LOCAL_DIR/nginx/md-editor.conf" > "$rendered_conf"
     fi
 
     print_info "同步 Nginx 配置到服务器..."
 
     # 同步配置
-    scp "$LOCAL_DIR/nginx/md-editor.conf" "$REMOTE_HOST:/tmp/md-editor.conf.new"
+    scp "$rendered_conf" "$REMOTE_HOST:/tmp/md-editor.conf.new"
 
     # 测试并重载
     ssh "$REMOTE_HOST" "
+        set -e
+        BACKUP_FILE='/etc/nginx/sites-available/md-editor.backup.\$(date +%Y%m%d_%H%M%S)'
+
         # 备份当前配置
-        cp /etc/nginx/sites-available/md-editor /etc/nginx/sites-available/md-editor.backup.$(date +%Y%m%d_%H%M%S)
+        if [ -f /etc/nginx/sites-available/md-editor ]; then
+            cp /etc/nginx/sites-available/md-editor \$BACKUP_FILE
+        fi
 
         # 应用新配置
         mv /tmp/md-editor.conf.new /etc/nginx/sites-available/md-editor
 
         # 测试配置语法
-        if nginx -t 2>&1 | grep -q 'syntax is ok'; then
+        if nginx -t >/tmp/nginx-test.log 2>&1; then
             nginx -s reload
             echo 'Nginx 配置已更新并重载'
         else
-            echo 'Nginx 配置语法错误，已回滚'
-            cp /etc/nginx/sites-available/md-editor.backup.* /etc/nginx/sites-available/md-editor
+            echo 'Nginx 配置语法错误，正在回滚'
+            if [ -f \$BACKUP_FILE ]; then
+                mv \$BACKUP_FILE /etc/nginx/sites-available/md-editor
+                nginx -t >/dev/null 2>&1 && nginx -s reload || true
+            else
+                rm -f /etc/nginx/sites-available/md-editor
+            fi
+            cat /tmp/nginx-test.log
             exit 1
         fi
     "
+
+    # 清理临时文件
+    rm -f "$rendered_conf"
 
     print_success "Nginx 配置部署完成"
 }
@@ -298,31 +296,33 @@ deploy_nginx() {
 # 验证部署
 verify_deployment() {
     print_title "4. 验证部署"
-    
+
     print_info "检查服务状态..."
-    
+
     # 检查后端服务
     if ssh "$REMOTE_HOST" "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/share/test" | grep -q "404"; then
         print_success "后端服务运行正常"
     else
         print_error "后端服务可能异常"
-        ssh "$REMOTE_HOST" "docker compose -f $REMOTE_DIR/docker-compose.yml logs --tail=10"
+        ssh "$REMOTE_HOST" "
+            cd $REMOTE_DIR
+            if docker compose version >/dev/null 2>&1; then
+                docker compose logs --tail=10
+            elif command -v docker-compose >/dev/null 2>&1; then
+                docker-compose logs --tail=10
+            else
+                echo '未找到 docker compose 命令'
+            fi
+        "
     fi
-    
+
     # 检查前端访问
-    if curl -s -o /dev/null -w "%{http_code}" https://md.foolgry.top | grep -q "200"; then
-        print_success "前端访问正常 (https://md.foolgry.top)"
+    if curl -s -o /dev/null -w "%{http_code}" "${PUBLIC_URL}" | grep -q "200"; then
+        print_success "前端访问正常 (${PUBLIC_URL})"
     else
         print_error "前端访问异常"
     fi
-    
-    # 检查编辑器认证
-    if curl -s -o /dev/null -w "%{http_code}" https://admin.md.foolgry.top | grep -q "401"; then
-        print_success "编辑器认证正常 (https://admin.md.foolgry.top)"
-    else
-        print_warning "编辑器认证可能异常"
-    fi
-    
+
     print_success "部署验证完成"
 }
 
@@ -349,7 +349,7 @@ show_usage() {
 # 主函数
 main() {
     print_title "公众号 Markdown 编辑器 - 部署脚本"
-    
+
     # 检查参数
     case "${1:-all}" in
         all)
@@ -394,11 +394,10 @@ main() {
             exit 1
             ;;
     esac
-    
+
     print_title "部署完成！"
     echo "访问地址："
-    echo "  - 主页: https://md.foolgry.top"
-    echo "  - 编辑器: https://admin.md.foolgry.top"
+    echo "  - 主页: ${PUBLIC_URL}"
     echo ""
     echo "管理命令："
     echo "  ssh $REMOTE_HOST 'cd $REMOTE_DIR && docker compose logs -f'"
