@@ -34,20 +34,7 @@ wxmd-cli --version
 如果用户在使用 Claude Code，将本 Skill 安装到 Claude Code 的技能目录：
 
 ```bash
-# 确定 Claude Code 技能目录
-SKILLS_DIR="$HOME/.claude/skills"
-
-# 创建技能目录
-mkdir -p "$SKILLS_DIR"
-
-# 克隆仓库或复制技能文件
-git clone https://github.com/foolgry/editor.git /tmp/editor
-
-# 复制 Skill 到 Claude Code 技能目录
-cp -r /tmp/editor/skills/wechat-markdown-editor "$SKILLS_DIR/"
-
-# 验证安装
-ls "$SKILLS_DIR/wechat-markdown-editor/SKILL.md"
+npx skills add foolgry/editor -g --all
 ```
 
 ---
@@ -224,33 +211,6 @@ npm uninstall -g @foolgry/wxmd-cli
 
 ---
 
-## 常见使用场景（给 Agent 的参考）
-
-### 场景 1: 用户想排版 Markdown 文件
-
-```bash
-# Agent 执行
-wxmd-cli typeset --input article.md --style wechat-tech --out article.html
-```
-
-### 场景 2: 用户想创建分享链接
-
-```bash
-# Agent 执行
-result=$(wxmd-cli share create --input article.md --style wechat-default)
-echo "$result"
-```
-
-### 场景 3: 批量处理多个文件
-
-```bash
-# Agent 执行
-for file in *.md; do
-  wxmd-cli typeset --input "$file" --out "${file%.md}.html"
-done
-```
-
----
 
 ## 相关文档
 

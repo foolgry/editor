@@ -51,7 +51,7 @@ Go 服务同时提供前端页面和后端 API，一个进程就够了。
 
 ## 部署
 
-详见 [DEPLOY.md](DEPLOY.md)。核心步骤：
+详见 [DEPLOY.md](docs/DEPLOY.md)。核心步骤：
 
 1. 复制 `.env.example` 为 `.env` 并填写配置
 2. `./deploy.sh` 一键部署
@@ -76,12 +76,12 @@ Go 服务同时提供前端页面和后端 API，一个进程就够了。
 
 让 AI Agent 帮你一键安装：
 ```txt
-请帮我安装 github.com/foolgry/editor 中的 Skills: npx skills add foolgry/editor
+请帮我安装 https://github.com/foolgry/editor/blob/master/docs/INSTALL.md 指令快速安装
 ```
 
 命令行安装
 ```bash
-npx skills add foolgry/editor
+npx skills add foolgry/editor -g --all
 ```
 
 或手动安装到 Claude Code：
