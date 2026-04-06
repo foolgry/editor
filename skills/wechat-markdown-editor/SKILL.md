@@ -1,3 +1,8 @@
+---
+name: wechat-markdown-editor
+description: 公众号 Markdown 编辑器 CLI 工具技能。当用户需要将 Markdown 排版为微信公众号格式、使用 wxmd-cli 进行文档排版、创建分享链接、列出样式主题或检查环境时使用。支持 typeset 排版、share 分享、styles 样式管理和 doctor 环境诊断等命令。
+---
+
 # wxmd-cli SKILL
 
 ## 概述
