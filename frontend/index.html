@@ -378,6 +378,37 @@
       font-family: var(--font-mono);
     }
 
+    /* 修复空格按钮 */
+    .fix-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: 6px 12px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 120ms;
+      color: var(--color-secondary);
+      font-size: 13px;
+    }
+
+    .fix-btn:hover {
+      background: var(--color-bg);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    .fix-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .fix-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
     /* 预览面板 */
     .preview-panel {
       display: flex;
@@ -1540,6 +1571,18 @@
               </span>
             </div>
           </div>
+          <button
+            class="fix-btn"
+            @click="fixTextSpaces"
+            :disabled="!markdownInput"
+            title="自动修复 CJK 空格和标点"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            <span>修复空格</span>
+          </button>
           <div class="char-count">
             {{ markdownInput.length }} 字符
           </div>
