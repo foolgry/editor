@@ -13,6 +13,7 @@ const { registerTypesetCommand } = require('./commands/typeset');
 const { registerShareCommand } = require('./commands/share');
 const { registerStylesCommand } = require('./commands/styles');
 const { registerDoctorCommand } = require('./commands/doctor');
+const { registerFormatCommand } = require('./commands/format');
 
 // 配置主程序
 program
@@ -36,6 +37,7 @@ registerTypesetCommand(program);
 registerShareCommand(program);
 registerStylesCommand(program);
 registerDoctorCommand(program);
+registerFormatCommand(program);
 
 // 自定义帮助信息
 program.on('--help', () => {
@@ -47,6 +49,8 @@ program.on('--help', () => {
   console.log('  $ wxmd-cli share get abc12345');
   console.log('  $ wxmd-cli styles list');
   console.log('  $ wxmd-cli doctor');
+  console.log('  $ wxmd-cli format --input article.md --out fixed.md');
+  console.log('  $ echo "hello世界" | wxmd-cli format');
   console.log('');
   console.log('Environment Variables:');
   console.log('  WXMD_API_URL    API server URL (default: http://localhost:8080)');
