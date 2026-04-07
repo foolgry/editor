@@ -81,6 +81,43 @@ cat article.md | wxmd-cli typeset --style wechat-nyt | jq -r '.data'
 wxmd-cli typeset --input article.md --style wechat-tech | jq .
 ```
 
+### `format` - 自动修复空格和标点
+
+使用 AutoCorrect 自动修复 Markdown 中的 CJK（中日韩）空格和标点问题。
+
+```bash
+wxmd-cli format --input <file> [options]
+
+选项：
+  -i, --input <file>    输入文件（默认从 stdin 读取）
+      --out <file>      输出到文件（默认输出到 stdout）
+```
+
+**功能说明：**
+- 自动在中英文之间添加空格（如 `你好World` → `你好 World`）
+- 纠正标点符号（中文内容使用全角标点）
+- 修复全宽字符和半宽字符问题
+
+**示例：**
+
+```bash
+# 修复文件并输出到新文件
+wxmd-cli format --input article.md --out fixed.md
+
+# 从 stdin 读取并输出到 stdout
+echo "hello世界，你好World" | wxmd-cli format
+# 输出: hello 世界，你好 World
+
+# JSON 格式输出（包含修复统计）
+wxmd-cli format --input article.md --output json
+# 输出: { "data": "...", "meta": { "changes": 5, "inputSize": 100, "outputSize": 105 } }
+```
+
+**使用场景：**
+- 批量修复现有 Markdown 文件的空格问题
+- 配合 `typeset` 命令使用：先修复，再排版
+- CI/CD 流水线中文案规范化检查
+
 ### `share create` - 创建分享
 
 创建在线分享链接（需要后端服务器）。

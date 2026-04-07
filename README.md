@@ -116,6 +116,10 @@ pnpm add -g @foolgry/wxmd-cli
 # Markdown 排版（本地执行）
 wxmd-cli typeset --input article.md --style wechat-tech
 
+# 自动修复空格和标点
+echo "hello世界" | wxmd-cli format
+wxmd-cli format --input article.md --out fixed.md
+
 # 创建分享（需服务器运行）
 wxmd-cli share create --input article.md --style wechat-default
 
