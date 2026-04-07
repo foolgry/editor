@@ -157,7 +157,7 @@ pnpm install
 ### 相关文档
 
 - **CLI 详细文档**: [wxmd-cli/README.md](wxmd-cli/README.md)
-- **Agent Skill 指南**: [skills/wechat-markdown-editor/INSTALL.md](skills/wechat-markdown-editor/INSTALL.md)
+- **Agent Skill 安装指南**: [docs/INSTALL.md](docs/INSTALL.md)
 - **Skill 使用手册**: [skills/wechat-markdown-editor/SKILL.md](skills/wechat-markdown-editor/SKILL.md)
 
 ## 开源协议
