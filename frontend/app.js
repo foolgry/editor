@@ -79,7 +79,8 @@ const editorApp = createApp({
       shareError: null,             // 分享错误信息
       shareServerUrl: window.location.origin,  // 自动使用当前页面域名
       shareCopySuccess: false,      // 分享链接复制成功状态
-      mermaidInitialized: false     // Mermaid 是否已初始化
+      mermaidInitialized: false,    // Mermaid 是否已初始化
+      autocorrect: null               // AutoCorrect 模块（动态加载）
     };
   },
 
@@ -146,6 +147,9 @@ const editorApp = createApp({
         this.renderMarkdown();
       }
     });
+
+    // 动态加载 AutoCorrect 模块
+    this.loadAutocorrect();
   },
 
   watch: {
@@ -199,6 +203,19 @@ const editorApp = createApp({
     },
 
     /**
+     * 动态加载 AutoCorrect 模块
+     */
+    async loadAutocorrect() {
+      try {
+        const module = await import('https://cdn.jsdelivr.net/npm/@huacnlee/autocorrect@latest/autocorrect.js');
+        this.autocorrect = module.default || module;
+        console.log('AutoCorrect 模块已加载');
+      } catch (err) {
+        console.warn('AutoCorrect 加载失败:', err);
+      }
+    },
+
+    /**
      * 自动修复文本中的 CJK 空格和标点问题
      */
     fixTextSpaces() {
@@ -208,9 +225,9 @@ const editorApp = createApp({
       }
 
       // 检查 autocorrect 是否可用
-      if (typeof autocorrect === 'undefined' || !autocorrect.format) {
+      if (!this.autocorrect || !this.autocorrect.format) {
         this.showToast('AutoCorrect 未加载', 'error');
-        console.error('autocorrect global object not found');
+        console.error('autocorrect module not loaded');
         return;
       }
 
@@ -219,7 +236,7 @@ const editorApp = createApp({
         const originalLength = this.markdownInput.length;
 
         // 调用 autocorrect 修复
-        const fixed = autocorrect.format(this.markdownInput, 'markdown');
+        const fixed = this.autocorrect.format(this.markdownInput, 'markdown');
 
         // 更新内容
         this.markdownInput = fixed;
