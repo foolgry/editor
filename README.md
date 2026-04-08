@@ -14,6 +14,8 @@
 > - 增加 Mermaid 图表渲染支持
 > - 增加分享功能（可将文章生成链接分享给他人查看）
 > - 增加中英文数字空格自动修复功能
+> - 增加 Agent / CLI 工作流支持
+> - 统一首页、CLI、分享页渲染内核
 > - 重构了整个项目结构
 
 ## 功能
@@ -70,101 +72,52 @@ Go 服务同时提供前端页面和后端 API，一个进程就够了。
 
 ## Agent CLI
 
-专为 AI Agent 设计的命令行工具，支持本地排版 Markdown 和调用分享 API。
+仓库内置 `wxmd-cli`，支持本地排版 Markdown、自动修复中英文空格与标点、调用分享 API。
 
-> 渲染一致性说明：`CLI typeset`、首页编辑器预览、`/s/:id` 分享页已统一复用 `frontend/render-core.js`。
-
-[![NPM](https://img.shields.io/badge/NPM-@foolgry/wxmd--cli-CB3837?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/@foolgry/wxmd-cli)
+> 渲染一致性说明：CLI `typeset`、首页编辑器预览、`/s/:id` 分享页统一复用 [frontend/render-core.js](frontend/render-core.js)。
 
 ### 安装 Skill（推荐）
 
-让 AI Agent 帮你一键安装：
-```txt
-请按照 https://github.com/foolgry/editor/blob/master/docs/INSTALL.md 文档帮我安装skills
-```
+Agent 可参考 [docs/INSTALL.md](docs/INSTALL.md) 安装 Skill，或直接使用仓库内的 [skills/wechat-markdown-editor/SKILL.md](skills/wechat-markdown-editor/SKILL.md)。
 
-命令行安装
-```bash
-npx skills add foolgry/editor -g --all
-```
-
-或手动安装到 Claude Code：
+如需全局安装 CLI：
 
 ```bash
-# 克隆仓库
-git clone https://github.com/foolgry/editor.git /tmp/editor
-
-# 复制 Skill 到 Claude Code 技能目录
-cp -r /tmp/editor/skills/wechat-markdown-editor ~/.claude/skills/
-```
-
-### 安装 CLI 工具（可选）
-
-> **注意**：一般情况下无需手动安装 CLI 工具，使用 Skill 时会自动通过 npx 运行。
-> 
-> 如需全局安装：
-
-```bash
-# 全局安装
 npm install -g @foolgry/wxmd-cli
-
-# 或使用 pnpm
-pnpm add -g @foolgry/wxmd-cli
 ```
 
-### 快速使用
-
-```bash
-# Markdown 排版（本地执行）
-wxmd-cli typeset --input article.md --style wechat-tech
-
-# 自动修复空格和标点
-echo "hello世界" | wxmd-cli format
-wxmd-cli format --input article.md --out fixed.md
-
-# 创建分享（需服务器运行）
-wxmd-cli share create --input article.md --style wechat-default
-
-# 获取分享内容
-wxmd-cli share get <share-id>
-
-# 列出可用样式（18种主题）
-wxmd-cli styles list
-
-# 环境检查
-wxmd-cli doctor
-```
-
-### 从源码安装（开发）
+### 从源码使用 CLI
 
 ```bash
 cd wxmd-cli
-pnpm install
-./src/index.js --help
+npm install
+
+# 查看帮助
+node src/index.js --help
+
+# Markdown 排版
+node src/index.js typeset --input article.md --style wechat-anthropic
+
+# 自动修复空格和标点
+echo "hello世界" | node src/index.js format --output text
+
+# 创建分享
+WXMD_API_URL=http://localhost:8080 node src/index.js share create --input article.md --style wechat-anthropic
 ```
 
-### 环境变量
+### CLI 命令
 
-- `WXMD_API_URL` - API 服务器地址（默认：`http://localhost:8080`）
-- `WXMD_API_TIMEOUT` - 请求超时（毫秒，默认：30000）
-
-### 输出格式
-
-默认 JSON 输出，面向 Agent 设计：
-
-```json
-{
-  "ok": true,
-  "data": { "html": "...", "file": "output.html" },
-  "meta": { "cliVersion": "1.0.0", "timestamp": "2026-04-06T10:30:00Z" }
-}
-```
+- `typeset`：将 Markdown 渲染为带内联样式的 HTML
+- `format`：自动修复 CJK 空格和标点问题
+- `share create/get`：创建和读取分享内容
+- `styles list`：列出当前仓库中的所有样式
+- `doctor`：检查 Node 版本、依赖与 API 连通性
 
 ### 相关文档
 
-- **CLI 详细文档**: [wxmd-cli/README.md](wxmd-cli/README.md)
-- **Agent Skill 安装指南**: [docs/INSTALL.md](docs/INSTALL.md)
-- **Skill 使用手册**: [skills/wechat-markdown-editor/SKILL.md](skills/wechat-markdown-editor/SKILL.md)
+- [wxmd-cli/README.md](wxmd-cli/README.md)
+- [docs/INSTALL.md](docs/INSTALL.md)
+- [skills/wechat-markdown-editor/SKILL.md](skills/wechat-markdown-editor/SKILL.md)
 
 ## 开源协议
 

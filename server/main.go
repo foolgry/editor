@@ -408,7 +408,9 @@ func handleSharePage(w http.ResponseWriter, r *http.Request) {
 
 	// 返回分享页面 HTML
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(generateSharePageHTML(share)))
+	baseURL := requestBaseURL(r)
+	pageURL := strings.TrimRight(baseURL, "/") + r.URL.Path
+	w.Write([]byte(generateSharePageHTML(share, baseURL, pageURL)))
 }
 
 func handleListPage(w http.ResponseWriter, r *http.Request) {
@@ -419,6 +421,32 @@ func handleListPage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(generateListPageHTML()))
+}
+
+func requestBaseURL(r *http.Request) string {
+	scheme := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+	if scheme == "" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		return ""
+	}
+
+	return scheme + "://" + host
+}
+
+func assetURL(baseURL string, assetPath string) string {
+	if strings.TrimSpace(baseURL) == "" {
+		return assetPath
+	}
+
+	return strings.TrimRight(baseURL, "/") + assetPath
 }
 
 // generateShareID 生成分享 ID
@@ -443,8 +471,15 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	json.NewEncoder(w).Encode(data)
 }
 
+const sharedFaviconHeadHTML = `
+  <link rel="icon" type="image/jpeg" href="/favicon.jpg">
+  <link rel="shortcut icon" href="/favicon.jpg">
+  <link rel="apple-touch-icon" href="/favicon.jpg">`
+
+const siteTitle = "内容排版及分享工具"
+
 // generateSharePageHTML 生成分享页面 HTML
-func generateSharePageHTML(share Share) string {
+func generateSharePageHTML(share Share, baseURL string, pageURL string) string {
 	cleanContent := stripCitationMarkers(share.Content)
 
 	// 提取标题：从 Markdown 内容中找第一个 # 开头的标题
@@ -459,29 +494,39 @@ func generateSharePageHTML(share Share) string {
 		description = "通过公众号排版器分享的文章"
 	}
 
+	pageTitle := siteTitle
+	if strings.TrimSpace(title) != "" {
+		pageTitle = title + " - " + siteTitle
+	}
+
+	sharePreviewImage := assetURL(baseURL, "/favicon.jpg")
+
 	const pageTemplate = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>__WX_EDITOR_TITLE__</title>
+  <title>__WX_EDITOR_PAGE_TITLE__</title>
   <meta name="description" content="__WX_EDITOR_DESCRIPTION__">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="alternate icon" href="/favicon.svg">
-  
-  <!-- Markdown 渲染库 -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="__WX_EDITOR_SITE_TITLE__">
+  <meta property="og:title" content="__WX_EDITOR_TITLE__">
+  <meta property="og:description" content="__WX_EDITOR_DESCRIPTION__">
+  <meta property="og:image" content="__WX_EDITOR_OG_IMAGE__">
+  <meta property="og:url" content="__WX_EDITOR_PAGE_URL__">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="__WX_EDITOR_TITLE__">
+  <meta name="twitter:description" content="__WX_EDITOR_DESCRIPTION__">
+  <meta name="twitter:image" content="__WX_EDITOR_OG_IMAGE__">
+__WX_EDITOR_FAVICONS__
+  <link rel="stylesheet" href="/brand.css?v=1">
+
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
-  
-  <!-- 代码高亮库 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/es/highlight.min.js"></script>
-  
-  <!-- Mermaid 图表库 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  
-  <!-- Vue.js -->
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.15/dist/vue.global.prod.js"></script>
-  
+
   <style>
     :root {
       --color-primary: #000;
@@ -492,15 +537,14 @@ func generateSharePageHTML(share Share) string {
       --color-surface: #FFF;
       --color-border: #E0E0E0;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      --font-mono: "SF Mono", Monaco, "Cascadia Code", "Consolas", monospace;
     }
-    
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
-    
+
     body {
       font-family: var(--font-sans);
       font-size: 15px;
@@ -509,85 +553,43 @@ func generateSharePageHTML(share Share) string {
       background-color: var(--color-bg);
       -webkit-font-smoothing: antialiased;
     }
-    
+
+    [v-cloak] {
+      display: none !important;
+    }
+
     .header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       padding: 16px 24px;
       border-bottom: 1px solid var(--color-border);
       background: var(--color-surface);
-      position: sticky;
-      top: 0;
-      z-index: 100;
     }
-    
+
     .logo {
       font-size: 16px;
       font-weight: 600;
       color: var(--color-primary);
       letter-spacing: -0.02em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      text-decoration: none;
-    }
-    
-    .logo:hover {
-      opacity: 0.8;
-    }
-    
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .style-badge {
-      padding: 6px 12px;
-      background: var(--color-bg);
-      border: 1px solid var(--color-border);
-      border-radius: 6px;
-      font-size: 13px;
-      color: var(--color-secondary);
-    }
-    
-    .btn {
-      padding: 8px 16px;
-      background: var(--color-accent);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      text-decoration: none;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      transition: opacity 0.2s;
+      gap: 8px;
     }
-    
-    .btn:hover {
-      opacity: 0.9;
+
+    .logo img {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      object-fit: cover;
     }
-    
-    .btn-secondary {
-      background: var(--color-surface);
-      color: var(--color-primary);
-      border: 1px solid var(--color-border);
-    }
-    
-    .btn-secondary:hover {
-      background: var(--color-bg);
-    }
-    
+
     .content {
       max-width: 800px;
       margin: 0 auto;
-      padding: 40px 24px;
+      padding: 40px 24px 64px;
     }
-    
+
     .loading {
       display: flex;
       flex-direction: column;
@@ -596,7 +598,7 @@ func generateSharePageHTML(share Share) string {
       min-height: 400px;
       color: var(--color-secondary);
     }
-    
+
     .spinner {
       width: 40px;
       height: 40px;
@@ -606,80 +608,48 @@ func generateSharePageHTML(share Share) string {
       animation: spin 1s linear infinite;
       margin-bottom: 16px;
     }
-    
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    
-    .footer {
-      text-align: center;
-      padding: 40px 24px;
-      border-top: 1px solid var(--color-border);
-      margin-top: 60px;
-    }
-    
-    .footer-text {
-      font-size: 13px;
-      color: var(--color-tertiary);
-    }
-    
-    .footer a {
-      color: var(--color-accent);
-      text-decoration: none;
-    }
-    
+
     .error {
       text-align: center;
       padding: 60px 24px;
       color: var(--color-secondary);
     }
-    
+
     .error-icon {
       font-size: 48px;
       margin-bottom: 16px;
     }
-    
-    /* Mermaid 图表样式 */
-    .mermaid {
-      background: #fff !important;
-      border-radius: 8px;
-      margin: 20px 0;
-      padding: 20px;
-      text-align: center;
-      overflow-x: auto;
-    }
-    
-    .mermaid svg {
-      max-width: 100%;
-      height: auto;
-      display: inline-block;
-    }
-    
+
     @media (max-width: 768px) {
       .header {
         padding: 12px 16px;
-        flex-wrap: wrap;
-        gap: 8px;
       }
-      
+
       .content {
-        padding: 24px 16px;
-      }
-      
-      .btn-text {
-        display: none;
+        padding: 24px 16px 48px;
       }
     }
   </style>
 </head>
 <body>
-  <div id="app">
-    <main class="content">
+  <div id="app" v-cloak>
+    <header class="header">
+      <div class="logo">
+        <img src="/favicon.jpg" alt="__WX_EDITOR_SITE_TITLE__">
+        <span>__WX_EDITOR_SITE_TITLE__</span>
+      </div>
+    </header>
+
+    <main class="content preview-container">
       <div v-if="loading" class="loading">
         <div class="spinner"></div>
         <p>正在加载内容...</p>
       </div>
-      
+
       <div v-else-if="error" class="error">
         <div class="error-icon">😕</div>
         <h3>{{ error }}</h3>
@@ -687,212 +657,34 @@ func generateSharePageHTML(share Share) string {
           <a href="/" style="color: var(--color-accent);">返回首页</a>
         </p>
       </div>
-      
+
       <div v-else v-html="renderedContent"></div>
     </main>
   </div>
 
-  <script src="/render-core.js"></script>
-  <script src="/styles.js"></script>
   <script>
-    const { createApp } = Vue;
-    
-    createApp({
-      data() {
-        return {
-          loading: true,
-          error: null,
-          renderedContent: '',
-          markdownContent: __WX_EDITOR_MARKDOWN_CONTENT__,
-          style: __WX_EDITOR_STYLE__,
-          copySuccess: false,
-          md: null
-        };
-      },
-      
-      mounted() {
-        this.initMarkdown();
-        this.renderContent();
-      },
-      
-      methods: {
-        initMarkdown() {
-          const renderCore = window.WXMDRenderCore;
-          if (renderCore && typeof renderCore.createMarkdownParser === 'function') {
-            this.md = renderCore.createMarkdownParser({
-              markdownit: window.markdownit,
-              hljs: typeof hljs !== 'undefined' ? hljs : null
-            });
-            return;
-          }
-
-          this.md = window.markdownit({
-            html: true,
-            linkify: true,
-            typographer: false
-          });
-        },
-        
-        async renderContent() {
-          try {
-            const renderCore = window.WXMDRenderCore;
-            const processedContent = renderCore && typeof renderCore.preprocessMarkdown === 'function'
-              ? renderCore.preprocessMarkdown(this.markdownContent)
-              : this.markdownContent;
-
-            let html = this.md.render(processedContent);
-            html = this.applyInlineStyles(html);
-            this.renderedContent = html;
-            this.loading = false;
-            
-            // 等待 DOM 更新后渲染 Mermaid 图表
-            await this.$nextTick();
-            this.renderMermaid();
-          } catch (err) {
-            console.error('渲染失败:', err);
-            this.error = '内容渲染失败';
-            this.loading = false;
-          }
-        },
-        
-        renderMermaid() {
-          if (typeof mermaid !== 'undefined') {
-            try {
-              mermaid.initialize({
-                startOnLoad: false,
-                theme: 'default',
-                securityLevel: 'loose',
-                flowchart: {
-                  useMaxWidth: true,
-                  htmlLabels: true,
-                  curve: 'basis'
-                },
-                sequence: {
-                  useMaxWidth: true,
-                  wrap: true
-                },
-                gantt: {
-                  useMaxWidth: true
-                }
-              });
-              
-              // 查找所有未渲染的 mermaid 图表
-              const mermaidElements = document.querySelectorAll('.mermaid:not([data-processed])');
-              if (mermaidElements.length > 0) {
-                mermaid.run({
-                  querySelector: '.mermaid'
-                });
-              }
-            } catch (err) {
-              console.error('Mermaid 渲染失败:', err);
-            }
-          }
-        },
-        
-        applyInlineStyles(html) {
-          const renderCore = window.WXMDRenderCore;
-          if (renderCore && typeof renderCore.applyInlineStyles === 'function') {
-            return renderCore.applyInlineStyles(html, {
-              styles: STYLES,
-              styleKey: this.style
-            });
-          }
-
-          const style = STYLES[this.style] ? STYLES[this.style].styles : STYLES['wechat-default'].styles;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          
-          Object.keys(style).forEach(selector => {
-            if (selector === 'pre' || selector === 'code' || selector === 'pre code') {
-              return;
-            }
-            
-            const elements = doc.querySelectorAll(selector);
-            elements.forEach(el => {
-              const currentStyle = el.getAttribute('style') || '';
-              el.setAttribute('style', currentStyle + '; ' + style[selector]);
-            });
-          });
-          
-          // 标题内的行内元素统一继承标题颜色
-          const headings = doc.querySelectorAll('h1, h2, h3, h4, h5, h6');
-          const headingInlineOverrides = {
-            strong: 'font-weight: 700; color: inherit !important; background-color: transparent !important;',
-            em: 'font-style: italic; color: inherit !important; background-color: transparent !important;',
-            a: 'color: inherit !important; text-decoration: none !important; border-bottom: 1px solid currentColor !important; background-color: transparent !important;',
-            code: 'color: inherit !important; background-color: transparent !important; border: none !important; padding: 0 !important;',
-            span: 'color: inherit !important; background-color: transparent !important;',
-            b: 'font-weight: 700; color: inherit !important; background-color: transparent !important;',
-            i: 'font-style: italic; color: inherit !important; background-color: transparent !important;',
-          };
-          const headingInlineSelectorList = Object.keys(headingInlineOverrides).join(', ');
-          
-          headings.forEach(heading => {
-            const inlineNodes = heading.querySelectorAll(headingInlineSelectorList);
-            inlineNodes.forEach(node => {
-              const tag = node.tagName.toLowerCase();
-              let override = headingInlineOverrides[tag];
-              if (!override) return;
-              
-              const currentStyle = node.getAttribute('style') || '';
-              const sanitizedStyle = currentStyle
-                .replace(/color:\s*[^;]+;?/gi, '')
-                .replace(/background(?:-color)?:\s*[^;]+;?/gi, '')
-                .replace(/border(?:-bottom)?:\s*[^;]+;?/gi, '')
-                .replace(/padding:\s*[^;]+;?/gi, '')
-                .replace(/;\s*;/g, ';')
-                .trim();
-              node.setAttribute('style', sanitizedStyle + '; ' + override);
-            });
-          });
-          
-          const container = doc.createElement('div');
-          container.setAttribute('style', style.container);
-          container.innerHTML = doc.body.innerHTML;
-          
-          return container.outerHTML;
-        },
-        
-        async copyContent() {
-          try {
-            // 获取渲染后的内容
-            const content = this.renderedContent;
-            
-            // 创建 Blob 用于复制
-            const blob = new Blob([content], { type: 'text/html' });
-            const clipboardItem = new ClipboardItem({ 'text/html': blob });
-            
-            await navigator.clipboard.write([clipboardItem]);
-            
-            this.copySuccess = true;
-            setTimeout(() => {
-              this.copySuccess = false;
-            }, 2000);
-          } catch (err) {
-            console.error('复制失败:', err);
-            // 降级方案
-            const textarea = document.createElement('textarea');
-            textarea.value = this.markdownContent;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            
-            this.copySuccess = true;
-            setTimeout(() => {
-              this.copySuccess = false;
-            }, 2000);
-          }
-        }
-      }
-    }).mount('#app');
+    window.__WX_EDITOR_SHARE__ = {
+      content: __WX_EDITOR_MARKDOWN_CONTENT__,
+      style: __WX_EDITOR_STYLE__
+    };
   </script>
+  <script src="/styles.js?v=11"></script>
+  <script src="/modules/text-utils.js?v=6"></script>
+  <script src="/render-core.js?v=1"></script>
+  <script src="/modules/render-utils.js?v=2"></script>
+  <script src="/modules/editor-methods.js?v=12"></script>
+  <script src="/share-page.js?v=1"></script>
 </body>
 </html>`
 
 	replacer := strings.NewReplacer(
+		"__WX_EDITOR_PAGE_TITLE__", html.EscapeString(pageTitle),
+		"__WX_EDITOR_SITE_TITLE__", html.EscapeString(siteTitle),
 		"__WX_EDITOR_TITLE__", html.EscapeString(title),
 		"__WX_EDITOR_DESCRIPTION__", html.EscapeString(description),
+		"__WX_EDITOR_OG_IMAGE__", html.EscapeString(sharePreviewImage),
+		"__WX_EDITOR_PAGE_URL__", html.EscapeString(pageURL),
+		"__WX_EDITOR_FAVICONS__", sharedFaviconHeadHTML,
 		"__WX_EDITOR_MARKDOWN_CONTENT__", strconv.Quote(cleanContent),
 		"__WX_EDITOR_STYLE__", strconv.Quote(share.Style),
 	)
@@ -906,7 +698,8 @@ func generateListPageHTML() string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>分享列表</title>
+  <title>` + siteTitle + ` - 分享列表</title>
+` + sharedFaviconHeadHTML + `
   <style>
     * { box-sizing: border-box; }
     body {

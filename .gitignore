@@ -24,7 +24,10 @@ CLAUDE.md
 # 数据库
 server/data
 data
+
 # wxmd-cli
 wxmd-cli/node_modules/
 wxmd-cli/pnpm-lock.yaml
+wxmd-cli/package-lock.json
+wxmd-cli/yarn.lock
 wxmd-cli/tests/output.html
