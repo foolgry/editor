@@ -41,6 +41,7 @@ var citeMarkerPattern = regexp.MustCompile(`\x{E200}cite\x{E202}[^\x{E201}]*\x{E
 var listPagePassword string
 
 const listPasswordHeader = "X-List-Password"
+const brandAssetVersion = "20260409-1"
 
 type ShareListItem struct {
 	ID        string    `json:"id"`
@@ -83,7 +84,7 @@ func main() {
 	staticDir := resolveStaticDir()
 	log.Printf("静态文件目录: %s", staticDir)
 	fileServer := http.FileServer(http.Dir(staticDir))
-	mux.Handle("/", fileServer)
+	mux.Handle("/", withStaticCache(fileServer))
 
 	// CORS 中间件
 	handler := corsMiddleware(mux)
@@ -519,7 +520,7 @@ func generateSharePageHTML(share Share, baseURL string, pageURL string) string {
   <meta name="twitter:description" content="__WX_EDITOR_DESCRIPTION__">
   <meta name="twitter:image" content="__WX_EDITOR_OG_IMAGE__">
 __WX_EDITOR_FAVICONS__
-  <link rel="stylesheet" href="/brand.css?v=1">
+  <link rel="stylesheet" href="/brand.css?v=` + brandAssetVersion + `">
 
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/atom-one-dark.min.css">
@@ -1163,4 +1164,17 @@ func resolveStaticDir() string {
 	}
 	// 回退到默认值，保持行为可预测
 	return "../frontend"
+}
+
+func withStaticCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/brand.css",
+			strings.HasSuffix(r.URL.Path, ".woff2"),
+			strings.HasSuffix(r.URL.Path, ".ttf"):
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
