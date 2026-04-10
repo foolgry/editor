@@ -2,7 +2,7 @@
 
 微信公众号 Markdown 编辑器 CLI - Agent-First 命令行工具。
 
-将 Markdown 转换为微信公众号可用的 HTML，支持 18 种精美样式主题。
+将 Markdown 转换为微信公众号可用的 HTML，支持 19 种精美样式主题。
 
 渲染内核与首页编辑器预览、分享页预览统一，减少本地与线上预览差异。
 
@@ -143,7 +143,7 @@ wxmd-cli share get <id>
 
 ### `styles list` - 列出样式
 
-查看所有可用的 18 种排版样式。
+查看所有可用的 19 种排版样式。
 
 ```bash
 wxmd-cli styles list
@@ -170,6 +170,7 @@ wxmd-cli doctor
 | `latepost-depth` | 晚点风格 | 深红色调，深度报道 |
 | `wechat-ft` | 金融时报 | 米黄色背景，财经风格 |
 | `wechat-anthropic` | Claude | 渐变色标题，现代感 |
+| `wechat-claude-song` | Claude Song | 宋体 Claude，适合长文阅读 |
 | `wechat-jonyive` | Jony Ive | 苹果前设计师风格 |
 | `wechat-deepread` | 深度阅读 | GitHub 风格，技术文档 |
 | `wechat-medium` | Medium 长文 | 博客平台风格 |

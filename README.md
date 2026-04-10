@@ -20,7 +20,7 @@
 
 ### 纯前端功能（无需后端）
 
-- 18 种样式主题（公众号、杂志、纽约时报、金融时报、Apple 极简、Claude 等）
+- 19 种样式主题（公众号、杂志、纽约时报、金融时报、Apple 极简、Claude、Claude Song 等）
 - 实时预览 + 一键复制到公众号
 - 智能图片处理：粘贴/拖拽图片、自动压缩、IndexedDB 本地存储、复制时转 Base64
 - 多图网格布局（类似朋友圈）
@@ -128,7 +128,7 @@ wxmd-cli share create --input article.md --style wechat-default
 # 获取分享内容
 wxmd-cli share get <share-id>
 
-# 列出可用样式（18种主题）
+# 列出可用样式（19种主题）
 wxmd-cli styles list
 
 # 环境检查
