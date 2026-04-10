@@ -71,6 +71,10 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    [v-cloak] {
+      display: none !important;
+    }
+
     #app {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1880,7 +1884,7 @@
   </style>
 </head>
 <body>
-  <div id="app">
+  <div id="app" v-cloak>
     <!-- 顶部栏 -->
     <header class="header">
       <div class="logo">
