@@ -197,6 +197,9 @@ const markdown = \`![图片](img://\${imageId})\`;
       // 等待 DOM 更新后渲染 Mermaid
       await this.$nextTick();
       this.renderMermaid();
+      if (typeof this.syncPreviewScroll === 'function') {
+        this.syncPreviewScroll();
+      }
     },
 
     preprocessMarkdown(content) {

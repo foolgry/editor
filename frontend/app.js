@@ -169,6 +169,9 @@ const editorApp = createApp({
       if (typeof this.renderMarkdown === 'function') {
         this.renderMarkdown();
       }
+      if (typeof this.bindEditorScrollSync === 'function') {
+        this.bindEditorScrollSync();
+      }
     });
 
     // 监听键盘事件（ESC 关闭右键菜单）
@@ -177,6 +180,12 @@ const editorApp = createApp({
         this.showContextMenu = false;
       }
     });
+  },
+
+  beforeUnmount() {
+    if (typeof this.unbindEditorScrollSync === 'function') {
+      this.unbindEditorScrollSync();
+    }
   },
 
   watch: {
@@ -286,6 +295,49 @@ const editorApp = createApp({
         console.error('AutoCorrect error:', err);
         this.showToast('修复失败: ' + err.message, 'error');
       }
+    },
+
+    bindEditorScrollSync() {
+      const editor = this.$refs.markdownInput;
+
+      if (!editor || this._syncPreviewScrollHandler) {
+        return;
+      }
+
+      this._syncPreviewScrollHandler = () => {
+        this.syncPreviewScroll();
+      };
+      editor.addEventListener('scroll', this._syncPreviewScrollHandler, { passive: true });
+      this.syncPreviewScroll();
+    },
+
+    unbindEditorScrollSync() {
+      const editor = this.$refs.markdownInput;
+
+      if (editor && this._syncPreviewScrollHandler) {
+        editor.removeEventListener('scroll', this._syncPreviewScrollHandler);
+      }
+      this._syncPreviewScrollHandler = null;
+    },
+
+    syncPreviewScroll() {
+      const editor = this.$refs.markdownInput || this.$el?.querySelector('.markdown-input');
+      const preview = this.$refs.previewContent || this.$el?.querySelector('.preview-content');
+
+      if (!editor || !preview) {
+        return;
+      }
+
+      const editorScrollableHeight = editor.scrollHeight - editor.clientHeight;
+      const previewScrollableHeight = preview.scrollHeight - preview.clientHeight;
+
+      if (editorScrollableHeight <= 0 || previewScrollableHeight <= 0) {
+        preview.scrollTop = 0;
+        return;
+      }
+
+      const scrollRatio = editor.scrollTop / editorScrollableHeight;
+      preview.scrollTop = scrollRatio * previewScrollableHeight;
     },
 
     ...SafeEditorMethods
