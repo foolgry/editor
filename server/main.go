@@ -466,8 +466,9 @@ func generateSharePageHTML(share Share) string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>__WX_EDITOR_TITLE__</title>
   <meta name="description" content="__WX_EDITOR_DESCRIPTION__">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="alternate icon" href="/favicon.svg">
+  <link rel="icon" type="image/jpeg" href="/favicon.jpg">
+  <link rel="shortcut icon" href="/favicon.jpg">
+  <link rel="apple-touch-icon" href="/favicon.jpg">
   
   <!-- Markdown 渲染库 -->
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>

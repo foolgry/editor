@@ -169,6 +169,9 @@ const editorApp = createApp({
       if (typeof this.renderMarkdown === 'function') {
         this.renderMarkdown();
       }
+      if (typeof this.bindEditorScrollSync === 'function') {
+        this.bindEditorScrollSync();
+      }
     });
 
     // 监听键盘事件（ESC 关闭右键菜单）
@@ -177,6 +180,12 @@ const editorApp = createApp({
         this.showContextMenu = false;
       }
     });
+  },
+
+  beforeUnmount() {
+    if (typeof this.unbindEditorScrollSync === 'function') {
+      this.unbindEditorScrollSync();
+    }
   },
 
   watch: {
@@ -286,6 +295,71 @@ const editorApp = createApp({
         console.error('AutoCorrect error:', err);
         this.showToast('修复失败: ' + err.message, 'error');
       }
+    },
+
+    bindEditorScrollSync() {
+      const editor = this.$refs.markdownInput;
+      const preview = this.$refs.previewContent;
+
+      if (!editor || !preview || this._scrollSyncHandlers) {
+        return;
+      }
+
+      this._scrollSyncHandlers = {
+        editor: () => {
+          this.syncScrollPosition(editor, preview);
+        },
+        preview: () => {
+          this.syncScrollPosition(preview, editor);
+        }
+      };
+      editor.addEventListener('scroll', this._scrollSyncHandlers.editor, { passive: true });
+      preview.addEventListener('scroll', this._scrollSyncHandlers.preview, { passive: true });
+      this.syncPreviewScroll();
+    },
+
+    unbindEditorScrollSync() {
+      const editor = this.$refs.markdownInput;
+      const preview = this.$refs.previewContent;
+
+      if (this._scrollSyncHandlers) {
+        if (editor) {
+          editor.removeEventListener('scroll', this._scrollSyncHandlers.editor);
+        }
+        if (preview) {
+          preview.removeEventListener('scroll', this._scrollSyncHandlers.preview);
+        }
+      }
+      this._scrollSyncHandlers = null;
+    },
+
+    syncPreviewScroll() {
+      const editor = this.$refs.markdownInput || this.$el?.querySelector('.markdown-input');
+      const preview = this.$refs.previewContent || this.$el?.querySelector('.preview-content');
+
+      this.syncScrollPosition(editor, preview);
+    },
+
+    syncScrollPosition(source, target) {
+      if (!source || !target || this._isSyncingScroll) {
+        return;
+      }
+
+      const sourceScrollableHeight = source.scrollHeight - source.clientHeight;
+      const targetScrollableHeight = target.scrollHeight - target.clientHeight;
+      const targetScrollTop = sourceScrollableHeight > 0 && targetScrollableHeight > 0
+        ? (source.scrollTop / sourceScrollableHeight) * targetScrollableHeight
+        : 0;
+
+      if (Math.abs(target.scrollTop - targetScrollTop) < 1) {
+        return;
+      }
+
+      this._isSyncingScroll = true;
+      target.scrollTop = targetScrollTop;
+      window.requestAnimationFrame(() => {
+        this._isSyncingScroll = false;
+      });
     },
 
     ...SafeEditorMethods
