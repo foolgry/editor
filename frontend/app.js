@@ -307,9 +307,11 @@ const editorApp = createApp({
 
       this._scrollSyncHandlers = {
         editor: () => {
+          this.showLinkedScrollbars(preview);
           this.syncScrollPosition(editor, preview);
         },
         preview: () => {
+          this.showLinkedScrollbars(preview);
           this.syncScrollPosition(preview, editor);
         }
       };
@@ -331,6 +333,7 @@ const editorApp = createApp({
         }
       }
       this._scrollSyncHandlers = null;
+      this.hideLinkedScrollbars();
     },
 
     syncPreviewScroll() {
@@ -359,6 +362,40 @@ const editorApp = createApp({
       target.scrollTop = targetScrollTop;
       window.requestAnimationFrame(() => {
         this._isSyncingScroll = false;
+      });
+    },
+
+    showLinkedScrollbars(...elements) {
+      const scrollElements = elements.filter(Boolean);
+      if (!scrollElements.length) {
+        return;
+      }
+
+      scrollElements.forEach((element) => {
+        element.classList.add('is-scrolling');
+      });
+
+      if (this._scrollbarHideTimeout) {
+        window.clearTimeout(this._scrollbarHideTimeout);
+      }
+
+      this._scrollbarHideTimeout = window.setTimeout(() => {
+        scrollElements.forEach((element) => {
+          element.classList.remove('is-scrolling');
+        });
+        this._scrollbarHideTimeout = null;
+      }, 700);
+    },
+
+    hideLinkedScrollbars() {
+      if (this._scrollbarHideTimeout) {
+        window.clearTimeout(this._scrollbarHideTimeout);
+        this._scrollbarHideTimeout = null;
+      }
+
+      const preview = this.$refs.previewContent;
+      [preview].filter(Boolean).forEach((element) => {
+        element.classList.remove('is-scrolling');
       });
     },
 

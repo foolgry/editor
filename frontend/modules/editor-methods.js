@@ -2194,13 +2194,14 @@ const markdown = \`![图片](img://\${imageId})\`;
       this.shareError = null;
 
       try {
+        const shareContent = await this.prepareShareContent();
         const response = await fetch(`${this.shareServerUrl}/api/share`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            content: this.markdownInput,
+            content: shareContent,
             style: this.currentStyle
           })
         });
@@ -2223,6 +2224,45 @@ const markdown = \`![图片](img://\${imageId})\`;
       } finally {
         this.sharing = false;
       }
+    },
+
+    async prepareShareContent() {
+      const imagePattern = /!\[([^\]]*)\]\(img:\/\/([^)]+)\)/g;
+      const matches = Array.from(this.markdownInput.matchAll(imagePattern));
+
+      if (!matches.length || !this.imageStore) {
+        return this.markdownInput;
+      }
+
+      const replacements = await Promise.all(matches.map(async (match) => {
+        const [markdownImage, altText, imageId] = match;
+
+        try {
+          const blob = await this.imageStore.getImageBlob(imageId);
+          if (!blob) {
+            return [markdownImage, markdownImage];
+          }
+
+          const dataUrl = await this.blobToDataUrl(blob);
+          return [markdownImage, `![${altText}](${dataUrl})`];
+        } catch (error) {
+          console.error(`分享图片转换失败 (${imageId}):`, error);
+          return [markdownImage, markdownImage];
+        }
+      }));
+
+      return replacements.reduce((content, [from, to]) => {
+        return content.split(from).join(to);
+      }, this.markdownInput);
+    },
+
+    blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('图片读取失败'));
+        reader.readAsDataURL(blob);
+      });
     },
 
     // 复制分享链接
