@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -474,8 +473,8 @@ func generateSharePageHTML(share Share) string {
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
   
   <!-- 代码高亮库 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/es/highlight.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
   
   <!-- Mermaid 图表库 -->
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -737,12 +736,19 @@ func generateSharePageHTML(share Share) string {
         async renderContent() {
           try {
             const renderCore = window.WXMDRenderCore;
-            const processedContent = renderCore && typeof renderCore.preprocessMarkdown === 'function'
-              ? renderCore.preprocessMarkdown(this.markdownContent)
-              : this.markdownContent;
-
-            let html = this.md.render(processedContent);
-            html = this.applyInlineStyles(html);
+            let html = '';
+            if (renderCore && typeof renderCore.renderMarkdown === 'function') {
+              html = renderCore.renderMarkdown(this.markdownContent, {
+                md: this.md,
+                styles: STYLES,
+                styleKey: this.style
+              });
+            } else {
+              const processedContent = renderCore && typeof renderCore.preprocessMarkdown === 'function'
+                ? renderCore.preprocessMarkdown(this.markdownContent)
+                : this.markdownContent;
+              html = this.applyInlineStyles(this.md.render(processedContent));
+            }
             this.renderedContent = html;
             this.loading = false;
             
@@ -894,11 +900,19 @@ func generateSharePageHTML(share Share) string {
 	replacer := strings.NewReplacer(
 		"__WX_EDITOR_TITLE__", html.EscapeString(title),
 		"__WX_EDITOR_DESCRIPTION__", html.EscapeString(description),
-		"__WX_EDITOR_MARKDOWN_CONTENT__", strconv.Quote(cleanContent),
-		"__WX_EDITOR_STYLE__", strconv.Quote(share.Style),
+		"__WX_EDITOR_MARKDOWN_CONTENT__", inlineJSONString(cleanContent),
+		"__WX_EDITOR_STYLE__", inlineJSONString(share.Style),
 	)
 
 	return replacer.Replace(pageTemplate)
+}
+
+func inlineJSONString(value string) string {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return `""`
+	}
+	return string(encoded)
 }
 
 func generateListPageHTML() string {
