@@ -573,7 +573,7 @@
     }
 
     /* 分享按钮 */
-    .share-btn {
+    .wxmd-share-button {
       display: flex;
       align-items: center;
       gap: 4px;
@@ -587,18 +587,18 @@
       font-size: 13px;
     }
 
-    .share-btn:hover {
+    .wxmd-share-button:hover {
       background: var(--color-bg);
       border-color: var(--color-accent);
       color: var(--color-accent);
     }
 
-    .share-btn:disabled {
+    .wxmd-share-button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
 
-    .share-btn svg {
+    .wxmd-share-button svg {
       width: 16px;
       height: 16px;
     }
@@ -2136,7 +2136,7 @@
             
             <!-- 分享按钮 -->
             <button
-              class="share-btn"
+              class="wxmd-share-button"
               :class="{ sharing: sharing }"
               @click="shareContent"
               :disabled="sharing || !markdownInput"
