@@ -2,7 +2,7 @@
 
 微信公众号 Markdown 编辑器 CLI - Agent-First 命令行工具。
 
-将 Markdown 转换为微信公众号可用的 HTML，支持 19 种精美样式主题。
+将 Markdown 转换为微信公众号可用的 HTML，支持 20 种精美样式主题。
 
 渲染内核与首页编辑器预览、分享页预览统一，减少本地与线上预览差异。
 
@@ -143,7 +143,7 @@ wxmd-cli share get <id>
 
 ### `styles list` - 列出样式
 
-查看所有可用的 19 种排版样式。
+查看所有可用的 20 种排版样式。
 
 ```bash
 wxmd-cli styles list
@@ -178,6 +178,7 @@ wxmd-cli doctor
 | `hische-editorial` | Hische·编辑部 | 衬线字体，编辑风格 |
 | `ando-concrete` | 安藤·清水 | 混凝土质感，建筑美学 |
 | `gaudi-organic` | 高迪·有机 | 彩色曲线，有机设计 |
+| `kami` | Kami | 暖米色底与墨蓝强调，印刷感阅读风格 |
 | `guardian` | Guardian 卫报 | 媒体网站风格 |
 | `nikkei` | Nikkei 日经 | 日本经济新闻风格 |
 | `lemonde` | Le Monde 世界报 | 法国报纸风格 |

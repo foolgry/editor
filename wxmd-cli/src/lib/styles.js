@@ -466,6 +466,35 @@ const STYLES = {
     }
   },
 
+  'kami': {
+    name: 'Kami',
+    styles: {
+      container: 'max-width: 700px; margin: 0 auto; padding: 18px 18px 38px 18px; font-family: "Source Han Sans SC", "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; font-size: 16px; line-height: 1.55 !important; letter-spacing: 0.3pt; color: #141413 !important; background-color: #f5f4ed !important; word-wrap: break-word;',
+      h1: 'font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif; font-size: 34px; font-weight: 500; line-height: 1.15 !important; color: #141413 !important; margin: 40px 0 20px; letter-spacing: 0.4pt;',
+      h2: 'font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif; font-size: 26px; font-weight: 500; line-height: 1.2 !important; color: #141413 !important; margin: 34px 0 16px; border-left: 4px solid #1B365D; padding-left: 12px; border-radius: 2px;',
+      h3: 'font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif; font-size: 21px; font-weight: 500; line-height: 1.25 !important; color: #141413 !important; margin: 28px 0 14px;',
+      h4: 'font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif; font-size: 18px; font-weight: 500; line-height: 1.3 !important; color: #3d3d3a !important; margin: 24px 0 12px;',
+      h5: 'font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif; font-size: 16px; font-weight: 500; line-height: 1.3 !important; color: #3d3d3a !important; margin: 20px 0 10px;',
+      h6: 'font-family: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif; font-size: 15px; font-weight: 500; line-height: 1.35 !important; color: #504e49 !important; margin: 18px 0 8px;',
+      p: 'margin: 16px 0 !important; line-height: 1.55 !important; color: #141413 !important;',
+      strong: 'font-weight: 500; color: #1B365D !important; background-color: #E4ECF5 !important; padding: 1px 6px; border-radius: 3px;',
+      em: 'font-style: normal; font-weight: 500; color: #3d3d3a !important;',
+      a: 'color: #1B365D !important; text-decoration: none; border-bottom: 1px solid #1B365D;',
+      ul: 'margin: 16px 0; padding-left: 24px; line-height: 1.55 !important;',
+      ol: 'margin: 16px 0; padding-left: 24px; line-height: 1.55 !important;',
+      li: 'margin: 8px 0; line-height: 1.55 !important; color: #141413 !important;',
+      blockquote: 'margin: 18px 0; padding: 6px 0 6px 14px; border-left: 2px solid #1B365D; color: #504e49 !important; line-height: 1.55 !important; background-color: transparent !important;',
+      code: 'font-family: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, Monaco, "Source Han Serif SC", monospace; font-size: 14px; padding: 2px 6px; background-color: #faf9f5 !important; color: #1B365D !important; border: 1px solid #e8e6dc; border-radius: 4px;',
+      pre: 'margin: 22px 0; padding: 14px 16px; background-color: #faf9f5 !important; border: 1px solid #e8e6dc; border-radius: 6px; overflow-x: auto; line-height: 1.5 !important; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);',
+      hr: 'margin: 32px 0; border: none; border-top: 1px solid #e8e6dc;',
+      img: 'max-width: 100%; max-height: 560px !important; height: auto; display: block; margin: 24px auto; border: 1px solid #e8e6dc; border-radius: 8px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);',
+      table: 'width: 100%; margin: 20px 0; border-collapse: collapse; font-size: 15px;',
+      th: 'text-align: left; font-weight: 500; color: #3d3d3a !important; padding: 10px 12px; border-bottom: 1px solid #e8e6dc; background-color: #faf9f5 !important;',
+      td: 'padding: 9px 12px; border-bottom: 1px solid #e5e3d8; color: #141413 !important; vertical-align: top;',
+      tr: 'border-bottom: 1px solid #e5e3d8;',
+    }
+  },
+
   // === 国际媒体风格 ===
   'guardian': {
     name: 'Guardian 卫报',
