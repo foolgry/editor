@@ -162,6 +162,7 @@ pnpm install
 
 ### 相关文档
 
+- **变更记录**: [CHANGELOG.md](CHANGELOG.md)（依据近期提交整理，便于查阅版本与功能演进）
 - **CLI 详细文档**: [wxmd-cli/README.md](wxmd-cli/README.md)
 - **Agent Skill 安装指南**: [docs/INSTALL.md](docs/INSTALL.md)
 - **Skill 使用手册**: [skills/wechat-markdown-editor/SKILL.md](skills/wechat-markdown-editor/SKILL.md)
