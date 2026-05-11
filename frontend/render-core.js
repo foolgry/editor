@@ -232,6 +232,14 @@
       }
     });
 
+    // 宽表格左右滑动：用 <section class="table-wrapper"> 包裹 <table>
+    md.renderer.rules.table_open = function() {
+      return '<section class="table-wrapper"><table>';
+    };
+    md.renderer.rules.table_close = function() {
+      return '</table></section>';
+    };
+
     if (config.patchScanner !== false) {
       patchMarkdownScanner(md);
     }
@@ -493,6 +501,47 @@
         el.setAttribute('style', currentStyle + '; ' + style[selector]);
       });
     });
+
+    // --- 宽表格左右滑动支持（在主题样式注入之后，确保宽度/nowrap 覆盖生效）---
+    // 1. 为 .table-wrapper 注入滚动容器样式
+    var tableWrappers = doc.querySelectorAll('.table-wrapper');
+    tableWrappers.forEach(function(wrapper) {
+      var currentStyle = wrapper.getAttribute('style') || '';
+      // 基础滚动样式（主题可通过 .table-wrapper 选择器覆盖）
+      if (!/overflow-x\s*:/.test(currentStyle)) {
+        wrapper.setAttribute('style', currentStyle +
+          '; display: block; box-sizing: border-box; width: 100%; max-width: 100%;' +
+          ' overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch;' +
+          ' margin: 20px 0; padding-bottom: 10px;');
+      }
+    });
+
+    // 2. 修改 table 为固定宽度 + min-width，触发窄屏滚动
+    var tables = doc.querySelectorAll('table');
+    tables.forEach(function(table) {
+      var currentStyle = table.getAttribute('style') || '';
+      var cleaned = currentStyle
+        .replace(/width\s*:\s*[^;]+;?/gi, '')
+        .replace(/min-width\s*:\s*[^;]+;?/gi, '')
+        .replace(/max-width\s*:\s*[^;]+;?/gi, '')
+        .replace(/table-layout\s*:\s*[^;]+;?/gi, '')
+        .replace(/margin\s*:\s*[^;]+;?/gi, '')
+        .replace(/;\s*;/g, ';')
+        .trim();
+      table.setAttribute('style', cleaned +
+        '; width: 720px; min-width: 100%; max-width: none; table-layout: auto; margin: 0;');
+    });
+
+    // 3. 为 th/td 添加 nowrap 防止内容换行
+    var cells = doc.querySelectorAll('th, td');
+    cells.forEach(function(cell) {
+      var currentStyle = cell.getAttribute('style') || '';
+      if (!/white-space\s*:/.test(currentStyle)) {
+        cell.setAttribute('style', currentStyle +
+          '; white-space: nowrap; word-break: keep-all; overflow-wrap: normal;');
+      }
+    });
+    // --- 宽表格左右滑动支持结束 ---
 
     const headings = doc.querySelectorAll('h1, h2, h3, h4, h5, h6');
     headings.forEach(function (heading) {
