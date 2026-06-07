@@ -135,6 +135,8 @@ wxmd-cli styles list
 wxmd-cli doctor
 ```
 
+编辑器里的「修复空格」会保留 Markdown 图片、链接等语法结构，不会把 `![alt](url)` 里的方括号或圆括号改成中文标点。
+
 ### 从源码安装（开发）
 
 ```bash

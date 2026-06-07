@@ -4,6 +4,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
+const frontendAutocorrect = require('../../frontend/lib/autocorrect.js');
 const { renderMarkdown } = require('../src/lib/renderer');
 const { success, error, getExitCode } = require('../src/lib/output');
 const { listStyles, hasStyle, getStyle } = require('../src/lib/styles');
@@ -64,6 +65,14 @@ describe('renderer', () => {
     const markdown = 'Hello \uE200cite\uE202turn1search1\uE201 World';
     const html = renderMarkdown(markdown, 'wechat-default');
     assert.ok(!html.includes('\uE200'));
+  });
+});
+
+describe('autocorrect', () => {
+  it('should preserve markdown image syntax when fixing spaces', () => {
+    const markdown = '![Nemotron 3 Ultra 架构示意] => ![Nemotron 3 Ultra 架构示意]';
+    const fixed = frontendAutocorrect.format(markdown);
+    assert.strictEqual(fixed, markdown);
   });
 });
 

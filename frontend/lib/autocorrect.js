@@ -59,6 +59,27 @@
   }
 
   /**
+   * 保护 Markdown 语法片段，避免格式化时破坏标记本身
+   */
+  function protectMarkdownSyntax(text) {
+    const protectedSegments = [];
+    const syntaxRegex = /!\[[^\]\n]*\](?:\([^\)\n]*\)|\[[^\]\n]*\])?|\[[^\]\n]*\](?:\([^\)\n]*\)|\[[^\]\n]*\])/g;
+    const protectedText = text.replace(syntaxRegex, (match) => {
+      const token = `\uE000MD${protectedSegments.length}\uE001`;
+      protectedSegments.push(match);
+      return token;
+    });
+
+    return { protectedText, protectedSegments };
+  }
+
+  function restoreMarkdownSyntax(text, protectedSegments) {
+    return text.replace(/\uE000MD(\d+)\uE001/g, (_, index) => {
+      return protectedSegments[Number(index)] || _;
+    });
+  }
+
+  /**
    * 格式化文本 - 核心函数
    */
   function format(text) {
@@ -66,12 +87,14 @@
       return text;
     }
 
+    const { protectedText, protectedSegments } = protectMarkdownSyntax(text);
+
     let result = '';
     let prevChar = '';
 
-    for (let i = 0; i < text.length; i++) {
-      let char = text[i];
-      let nextChar = text[i + 1] || '';
+    for (let i = 0; i < protectedText.length; i++) {
+      let char = protectedText[i];
+      let nextChar = protectedText[i + 1] || '';
 
       // 在 CJK 和英文/数字之间添加空格
       if (isCJK(char) && isAlphaNum(nextChar)) {
@@ -96,7 +119,7 @@
     // 清理行首行尾空格
     result = result.replace(/\n /g, '\n').replace(/ \n/g, '\n');
 
-    return result;
+    return restoreMarkdownSyntax(result, protectedSegments);
   }
 
   /**
