@@ -10,27 +10,17 @@
   <link rel="alternate icon" href="favicon.svg">
   <link rel="mask-icon" href="favicon.svg" color="#0066FF">
 
-  <!-- Markdown 渲染库 -->
-  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
+  <!-- 代码高亮样式 -->
+  <link rel="stylesheet" href="lib/vendor/atom-one-dark.min.css">
 
-  <!-- 代码高亮库 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/atom-one-dark.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
-  
-  <!-- Mermaid 图表库 -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <!-- 核心库（自托管 + defer 按序执行，不阻塞首屏渲染） -->
+  <script src="lib/vendor/markdown-it.min.js" defer></script>
+  <script src="lib/vendor/highlight.min.js" defer></script>
+  <script src="lib/vendor/vue.global.prod.js" defer></script>
 
-  <!-- AutoCorrect - 自动修复 CJK 空格和标点 -->
-  <script src="lib/autocorrect.js"></script>
-
-  <!-- Turndown - HTML 转 Markdown 库 -->
-  <script src="https://cdn.jsdelivr.net/npm/turndown@7.2.0/dist/turndown.js"></script>
-
-  <!-- Vue.js -->
-  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.15/dist/vue.global.prod.js"></script>
-
-  <!-- html2canvas - 用于生成小红书图片 -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <!-- 以下大体积库改为按需加载（见 lib/lazy-loader.js），首屏不加载：
+       mermaid（图表）、turndown（HTML 转 MD）、html2canvas（小红书图片） -->
+  <script src="lib/lazy-loader.js?v=23" defer></script>
 
   <style>
     :root {
@@ -2460,15 +2450,15 @@
     ></div>
   </div>
 
-  <!-- 加载脚本 -->
-  <script src="styles.js?v=18"></script>
-  <script src="modules/image-store.js?v=18"></script>
-  <script src="modules/image-compressor.js?v=18"></script>
-  <script src="modules/image-host-manager.js?v=18"></script>
-  <script src="modules/text-utils.js?v=18"></script>
-  <script src="lib/autocorrect.js?v=18"></script>
-  <script src="render-core.js?v=18"></script>
-  <script src="modules/editor-methods.js?v=21"></script>
-  <script src="app.js?v=22"></script>
+  <!-- 加载脚本（defer：与 head 中的库保持文档顺序，在 DOMContentLoaded 前按序执行） -->
+  <script src="styles.js?v=18" defer></script>
+  <script src="modules/image-store.js?v=18" defer></script>
+  <script src="modules/image-compressor.js?v=18" defer></script>
+  <script src="modules/image-host-manager.js?v=18" defer></script>
+  <script src="modules/text-utils.js?v=18" defer></script>
+  <script src="lib/autocorrect.js?v=18" defer></script>
+  <script src="render-core.js?v=18" defer></script>
+  <script src="modules/editor-methods.js?v=23" defer></script>
+  <script src="app.js?v=23" defer></script>
 </body>
 </html>

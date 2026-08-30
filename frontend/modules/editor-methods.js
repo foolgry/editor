@@ -248,14 +248,24 @@ const markdown = \`![图片](img://\${imageId})\`;
       return content.replace(/\uE200cite\uE202[^\uE201]*\uE201/g, '');
     },
 
-    renderMermaid() {
-      if (typeof mermaid === 'undefined') {
+    async renderMermaid() {
+      // 页面中没有 mermaid 图表时不加载 mermaid 库（3MB+）
+      if (!document.querySelector('.preview-container .mermaid')) {
         return;
       }
 
       try {
+        // mermaid 为按需加载，首屏不引入
+        let mermaidLib = typeof mermaid !== 'undefined' ? mermaid : null;
+        if (!mermaidLib && window.WXMDLazy) {
+          mermaidLib = await window.WXMDLazy.loadMermaid();
+        }
+        if (!mermaidLib) {
+          return;
+        }
+
         if (!this.mermaidInitialized) {
-          mermaid.initialize({
+          mermaidLib.initialize({
             startOnLoad: false,
             theme: 'default',
             securityLevel: 'loose',
@@ -275,7 +285,7 @@ const markdown = \`![图片](img://\${imageId})\`;
           this.mermaidInitialized = true;
         }
 
-        mermaid.run({
+        mermaidLib.run({
           querySelector: '.preview-container .mermaid'
         });
       } catch (error) {
@@ -1132,14 +1142,28 @@ const markdown = \`![图片](img://\${imageId})\`;
       };
     },
 
-    // 初始化 Turndown 服务
-    initTurndownService() {
-      if (typeof TurndownService === 'undefined') {
+    // 初始化 Turndown 服务（按需加载，幂等）
+    async initTurndownService() {
+      if (this.turndownService) {
+        return;
+      }
+
+      // turndown 为按需加载，首屏不引入
+      let TurndownServiceLib = typeof TurndownService !== 'undefined' ? TurndownService : null;
+      if (!TurndownServiceLib && window.WXMDLazy) {
+        try {
+          TurndownServiceLib = await window.WXMDLazy.loadTurndown();
+        } catch (error) {
+          console.error('Turndown 库加载失败，智能粘贴功能将不可用:', error);
+          return;
+        }
+      }
+      if (!TurndownServiceLib) {
         console.warn('Turndown 库未加载，智能粘贴功能将不可用');
         return;
       }
 
-      this.turndownService = new TurndownService({
+      this.turndownService = new TurndownServiceLib({
         headingStyle: 'atx',        // 使用 # 样式的标题
         bulletListMarker: '-',       // 无序列表使用 -
         codeBlockStyle: 'fenced',    // 代码块使用 ```
@@ -1214,6 +1238,11 @@ const markdown = \`![图片](img://\${imageId})\`;
       if (!clipboardData) {
         console.log('不支持 clipboardData');
         return; // 不支持的浏览器，使用默认行为
+      }
+
+      // 确保按需加载的 Turndown 已就绪（幂等，已初始化时立即返回）
+      if (typeof this.initTurndownService === 'function') {
+        await this.initTurndownService();
       }
 
       // 调试模式（需要时可以打开）
@@ -1563,9 +1592,20 @@ const markdown = \`![图片](img://\${imageId})\`;
         return;
       }
 
+      // html2canvas 为按需加载，首屏不引入
       if (typeof html2canvas === 'undefined') {
-        this.showToast('html2canvas 库未加载', 'error');
-        return;
+        if (window.WXMDLazy) {
+          try {
+            await window.WXMDLazy.loadHtml2canvas();
+          } catch (error) {
+            console.error('html2canvas 加载失败:', error);
+            this.showToast('html2canvas 库加载失败', 'error');
+            return;
+          }
+        } else {
+          this.showToast('html2canvas 库未加载', 'error');
+          return;
+        }
       }
 
       this.xiaohongshuGenerating = true;

@@ -469,18 +469,16 @@ func generateSharePageHTML(share Share) string {
   <link rel="alternate icon" href="/favicon.svg">
   <link rel="mask-icon" href="/favicon.svg" color="#0066FF">
   
-  <!-- Markdown 渲染库 -->
-  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js"></script>
-  
-  <!-- 代码高亮库 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/atom-one-dark.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
-  
-  <!-- Mermaid 图表库 -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  
-  <!-- Vue.js -->
-  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.15/dist/vue.global.prod.js"></script>
+  <!-- 代码高亮样式（自托管） -->
+  <link rel="stylesheet" href="/lib/vendor/atom-one-dark.min.css">
+
+  <!-- 核心库（自托管 + defer 按序执行，不阻塞首屏渲染） -->
+  <script src="/lib/vendor/markdown-it.min.js" defer></script>
+  <script src="/lib/vendor/highlight.min.js" defer></script>
+  <script src="/lib/vendor/vue.global.prod.js" defer></script>
+
+  <!-- mermaid（3MB+）改为按需加载，仅当文章含图表时才引入（见下方 renderMermaid） -->
+  <script src="/lib/lazy-loader.js" defer></script>
   
   <style>
     :root {
@@ -692,11 +690,15 @@ func generateSharePageHTML(share Share) string {
     </main>
   </div>
 
-  <script src="/render-core.js"></script>
-  <script src="/styles.js"></script>
+  <script src="/lib/lazy-loader.js" defer></script>
+  <script src="/render-core.js" defer></script>
+  <script src="/styles.js" defer></script>
   <script>
+    // 库脚本均带 defer，会在 DOMContentLoaded 之前按文档顺序执行完毕，
+    // 因此在 DOMContentLoaded 回调里启动应用时 Vue / markdown-it / hljs 已就绪
+    document.addEventListener('DOMContentLoaded', function() {
     const { createApp } = Vue;
-    
+
     createApp({
       data() {
         return {
@@ -762,37 +764,49 @@ func generateSharePageHTML(share Share) string {
           }
         },
         
-        renderMermaid() {
-          if (typeof mermaid !== 'undefined') {
-            try {
-              mermaid.initialize({
-                startOnLoad: false,
-                theme: 'default',
-                securityLevel: 'loose',
-                flowchart: {
-                  useMaxWidth: true,
-                  htmlLabels: true,
-                  curve: 'basis'
-                },
-                sequence: {
-                  useMaxWidth: true,
-                  wrap: true
-                },
-                gantt: {
-                  useMaxWidth: true
-                }
-              });
-              
-              // 查找所有未渲染的 mermaid 图表
-              const mermaidElements = document.querySelectorAll('.mermaid:not([data-processed])');
-              if (mermaidElements.length > 0) {
-                mermaid.run({
-                  querySelector: '.mermaid'
-                });
-              }
-            } catch (err) {
-              console.error('Mermaid 渲染失败:', err);
+        async renderMermaid() {
+          // 页面中没有 mermaid 图表时不加载 mermaid 库（3MB+）
+          if (!document.querySelector('.mermaid')) {
+            return;
+          }
+
+          try {
+            // mermaid 为按需加载，首屏不引入
+            let mermaidLib = typeof mermaid !== 'undefined' ? mermaid : null;
+            if (!mermaidLib && window.WXMDLazy) {
+              mermaidLib = await window.WXMDLazy.loadMermaid();
             }
+            if (!mermaidLib) {
+              return;
+            }
+
+            mermaidLib.initialize({
+              startOnLoad: false,
+              theme: 'default',
+              securityLevel: 'loose',
+              flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+              },
+              sequence: {
+                useMaxWidth: true,
+                wrap: true
+              },
+              gantt: {
+                useMaxWidth: true
+              }
+            });
+
+            // 查找所有未渲染的 mermaid 图表
+            const mermaidElements = document.querySelectorAll('.mermaid:not([data-processed])');
+            if (mermaidElements.length > 0) {
+              mermaidLib.run({
+                querySelector: '.mermaid'
+              });
+            }
+          } catch (err) {
+            console.error('Mermaid 渲染失败:', err);
           }
         },
         
@@ -893,6 +907,7 @@ func generateSharePageHTML(share Share) string {
         }
       }
     }).mount('#app');
+    });
   </script>
 </body>
 </html>`
