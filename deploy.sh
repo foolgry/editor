@@ -225,6 +225,9 @@ server {
     listen 80;
     server_name ${PUBLIC_DOMAIN};
 
+    # 允许上传图片（服务端另有 10MB 单文件限制）
+    client_max_body_size 20m;
+
     location / {
         root ${REMOTE_DIR}/frontend;
         index index.html;
@@ -232,6 +235,15 @@ server {
     }
 
     location ~ ^/(s|api)/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /uploads/ {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -266,15 +278,18 @@ EOF
     # 测试并重载
     ssh "$REMOTE_HOST" "
         set -e
-        BACKUP_FILE='/etc/nginx/sites-available/md-editor.backup.\$(date +%Y%m%d_%H%M%S)'
+        BACKUP_DIR='/root/nginx-backup'
+        mkdir -p \$BACKUP_DIR
+        BACKUP_FILE=\"\$BACKUP_DIR/md-editor.\$(date +%Y%m%d_%H%M%S)\"
 
-        # 备份当前配置
-        if [ -f /etc/nginx/sites-available/md-editor ]; then
-            cp /etc/nginx/sites-available/md-editor \$BACKUP_FILE
+        # 备份当前配置（sites-enabled 才是 nginx 实际加载的文件）
+        if [ -f /etc/nginx/sites-enabled/md-editor ]; then
+            cp /etc/nginx/sites-enabled/md-editor \$BACKUP_FILE
         fi
 
-        # 应用新配置
-        mv /tmp/md-editor.conf.new /etc/nginx/sites-available/md-editor
+        # 应用新配置：同时写入 sites-available 和 sites-enabled
+        cp /tmp/md-editor.conf.new /etc/nginx/sites-available/md-editor
+        mv /tmp/md-editor.conf.new /etc/nginx/sites-enabled/md-editor
 
         # 测试配置语法
         if nginx -t >/tmp/nginx-test.log 2>&1; then
@@ -283,10 +298,10 @@ EOF
         else
             echo 'Nginx 配置语法错误，正在回滚'
             if [ -f \$BACKUP_FILE ]; then
-                mv \$BACKUP_FILE /etc/nginx/sites-available/md-editor
+                cp \$BACKUP_FILE /etc/nginx/sites-enabled/md-editor
                 nginx -t >/dev/null 2>&1 && nginx -s reload || true
             else
-                rm -f /etc/nginx/sites-available/md-editor
+                rm -f /etc/nginx/sites-enabled/md-editor
             fi
             cat /tmp/nginx-test.log
             exit 1

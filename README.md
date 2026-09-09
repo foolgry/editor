@@ -35,7 +35,8 @@
 - 将文章生成短链接，发送给他人查看
 - 保留当前主题样式
 - 分享管理列表（`/list`，需密码）
-- **注意**：分享内容保存在服务器 SQLite 数据库中（`server/data/shares.db`）
+- 图片上传接口（`/api/upload`），供 Skill 发布本地图片
+- **注意**：分享内容保存在服务器 SQLite 数据库中（`server/data/shares.db`），上传的图片保存在 `server/data/uploads/`
 
 ## 快速开始
 
@@ -66,17 +67,12 @@ Go 服务同时提供前端页面和后端 API，一个进程就够了。
 - IndexedDB（图片存储）+ Canvas API（图片压缩）+ Turndown（智能粘贴）
 - Go + SQLite（后端分享服务）
 - 纯 CSS，无需构建工具
-- Node.js CLI（Agent-First 命令行工具）
 
-## Agent CLI
+## Agent Skill（线上发布）
 
-专为 AI Agent 设计的命令行工具，支持本地排版 Markdown 和调用分享 API。
+专为 AI Agent 设计的发布技能：**纯线上模式**，通过 HTTP 请求把 Markdown 写入线上编辑器并返回分享链接，不做本地渲染。核心是一个零依赖的 Python 脚本（`skills/wechat-markdown-editor/scripts/publish.py`，仅用标准库）。
 
-> 渲染一致性说明：`CLI typeset`、首页编辑器预览、`/s/:id` 分享页已统一复用 `frontend/render-core.js`。
-
-[![NPM](https://img.shields.io/badge/NPM-@foolgry/wxmd--cli-CB3837?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/@foolgry/wxmd-cli)
-
-### 安装 Skill（推荐）
+### 安装 Skill
 
 让 AI Agent 帮你一键安装：
 ```txt
@@ -88,84 +84,40 @@ Go 服务同时提供前端页面和后端 API，一个进程就够了。
 npx skills add foolgry/editor -g --all
 ```
 
-或手动安装到 Claude Code：
+或手动复制技能目录到 Agent 的技能目录（如 `~/.claude/skills/` 或 `~/.agents/skills/`）：
 
 ```bash
-# 克隆仓库
 git clone https://github.com/foolgry/editor.git /tmp/editor
-
-# 复制 Skill 到 Claude Code 技能目录
-cp -r /tmp/editor/skills/wechat-markdown-editor ~/.claude/skills/
-```
-
-### 安装 CLI 工具（可选）
-
-> **注意**：一般情况下无需手动安装 CLI 工具，使用 Skill 时会自动通过 npx 运行。
-> 
-> 如需全局安装：
-
-```bash
-# 全局安装
-npm install -g @foolgry/wxmd-cli
-
-# 或使用 pnpm
-pnpm add -g @foolgry/wxmd-cli
+cp -r /tmp/editor/skills/wechat-markdown-editor ~/.agents/skills/
 ```
 
 ### 快速使用
 
 ```bash
-# Markdown 排版（本地执行）
-wxmd-cli typeset --input article.md --style wechat-tech
+# 发布本地 Markdown 文件（本地图片自动上传）
+python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md --style wechat-default
 
-# 自动修复空格和标点
-echo "hello世界" | wxmd-cli format
-wxmd-cli format --input article.md --out fixed.md
+# 发布纯文本
+python3 skills/wechat-markdown-editor/scripts/publish.py publish --text "# 标题"
 
-# 创建分享（需服务器运行）
-wxmd-cli share create --input article.md --style wechat-default
+# 发布后用浏览器打开
+python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md --open
 
-# 获取分享内容
-wxmd-cli share get <share-id>
-
-# 列出可用样式（20种主题）
-wxmd-cli styles list
-
-# 环境检查
-wxmd-cli doctor
+# 获取/列出/删除分享（list/delete 需要 WXMD_LIST_PASSWORD）
+python3 skills/wechat-markdown-editor/scripts/publish.py get <share-id>
 ```
 
-编辑器里的「修复空格」会保留 Markdown 图片、链接等语法结构，不会把 `![alt](url)` 里的方括号或圆括号改成中文标点。
-
-### 从源码安装（开发）
-
-```bash
-cd wxmd-cli
-pnpm install
-./src/index.js --help
-```
+输出 JSON：`{"id", "url", "style", "uploadedImages"}`，`url` 即分享链接。
 
 ### 环境变量
 
-- `WXMD_API_URL` - API 服务器地址（默认：`http://localhost:8080`）
-- `WXMD_API_TIMEOUT` - 请求超时（毫秒，默认：30000）
-
-### 输出格式
-
-默认 JSON 输出，面向 Agent 设计：
-
-```json
-{
-  "ok": true,
-  "data": { "html": "...", "file": "output.html" },
-  "meta": { "cliVersion": "1.0.0", "timestamp": "2026-04-06T10:30:00Z" }
-}
-```
+- `WXMD_API_URL` - API 服务器地址（默认：`https://md.foolgry.top`）
+- `WXMD_API_TIMEOUT` - 请求超时（秒，默认：30）
+- `WXMD_LIST_PASSWORD` - 列表/删除操作的管理密码
 
 ### 相关文档
 
 - **变更记录**: [CHANGELOG.md](CHANGELOG.md)（依据近期提交整理，便于查阅版本与功能演进）
-- **CLI 详细文档**: [wxmd-cli/README.md](wxmd-cli/README.md)
 - **Agent Skill 安装指南**: [docs/INSTALL.md](docs/INSTALL.md)
 - **Skill 使用手册**: [skills/wechat-markdown-editor/SKILL.md](skills/wechat-markdown-editor/SKILL.md)
 

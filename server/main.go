@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -73,6 +74,11 @@ func main() {
 	mux.HandleFunc("/api/share", handleCreateShare)
 	mux.HandleFunc("/api/share/", handleShareByID)
 	mux.HandleFunc("/api/shares", handleListShares)
+	mux.HandleFunc("/api/upload", handleUploadImage)
+
+	// 上传的图片
+	uploadsDir := resolveUploadsDir()
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))))
 
 	// 分享页面路由
 	mux.HandleFunc("/s/", handleSharePage)
@@ -433,6 +439,88 @@ func extractShareID(path string, prefix string) string {
 func isListAuthorized(r *http.Request) bool {
 	password := strings.TrimSpace(r.Header.Get(listPasswordHeader))
 	return password == listPagePassword
+}
+
+// 允许上传的图片类型
+var allowedImageExts = map[string]string{
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".svg":  "image/svg+xml",
+}
+
+const maxUploadSize = 10 << 20 // 10MB
+
+// resolveUploadsDir 上传图片存储目录，随 SQLite 数据目录一起持久化
+func resolveUploadsDir() string {
+	return filepath.Join(".", "data", "uploads")
+}
+
+// handleUploadImage 上传图片，返回可访问的 URL
+func handleUploadImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "请求解析失败或文件超过 10MB 限制",
+		})
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "缺少 file 字段",
+		})
+		return
+	}
+	defer file.Close()
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if _, ok := allowedImageExts[ext]; !ok {
+		respondJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "不支持的图片格式，仅支持 png/jpg/jpeg/gif/webp/svg",
+		})
+		return
+	}
+
+	uploadsDir := resolveUploadsDir()
+	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+		log.Printf("创建上传目录失败: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "保存图片失败",
+		})
+		return
+	}
+
+	filename := uuid.New().String() + ext
+	dst, err := os.Create(filepath.Join(uploadsDir, filename))
+	if err != nil {
+		log.Printf("创建图片文件失败: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "保存图片失败",
+		})
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		log.Printf("写入图片失败: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "保存图片失败",
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, map[string]string{
+		"url": "/uploads/" + filename,
+	})
 }
 
 // respondJSON 返回 JSON 响应
