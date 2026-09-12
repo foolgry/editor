@@ -95,7 +95,7 @@ cp -r /tmp/editor/skills/wechat-markdown-editor ~/.agents/skills/
 
 ```bash
 # 发布本地 Markdown 文件（本地图片自动上传）
-python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md --style wechat-default
+python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md
 
 # 发布纯文本
 python3 skills/wechat-markdown-editor/scripts/publish.py publish --text "# 标题"

@@ -27,6 +27,7 @@ from pathlib import Path
 
 DEFAULT_BASE_URL = "https://md.foolgry.top"
 DEFAULT_TIMEOUT = 30
+DEFAULT_STYLE = "kami-slides"
 
 STYLES = {
     "wechat-default": "默认公众号风格",
@@ -37,13 +38,22 @@ STYLES = {
     "wechat-tech": "技术风格",
     "wechat-elegant": "优雅简约",
     "wechat-deepread": "深度阅读",
+    "wechat-nyt": "纽约时报",
     "wechat-jonyive": "Jony Ive",
+    "wechat-medium": "Medium 长文",
     "wechat-apple": "Apple 极简",
     "kenya-emptiness": "原研哉·空",
     "hische-editorial": "Hische·编辑部",
     "ando-concrete": "安藤·清水",
     "gaudi-organic": "高迪·有机",
-    "kami": "Kami",
+    "kami-resume": "Kami · 简历",
+    "kami-print": "Kami · 白底单页",
+    "kami-report": "Kami · 财报研报",
+    "kami-slides": "Kami · 演讲文稿",
+    "kami-product": "Kami · 产品简报",
+    "kami-letter": "Kami · 正式信函",
+    "kami-changelog": "Kami · 更新日志",
+    "kami-portfolio": "Kami · 沉静画册",
     "guardian": "Guardian 卫报",
     "nikkei": "Nikkei 日経",
     "lemonde": "Le Monde 世界报",
@@ -285,8 +295,8 @@ def main():
     p_pub = sub.add_parser("publish", help="发布 Markdown 内容，返回分享链接")
     p_pub.add_argument("--file", help="本地 Markdown 文件路径（本地图片会自动上传）")
     p_pub.add_argument("--text", help="直接传入 Markdown 文本")
-    p_pub.add_argument("--style", default="wechat-default",
-                       help=f"排版样式，默认 wechat-default，可选: {', '.join(STYLES)}")
+    p_pub.add_argument("--style", default=DEFAULT_STYLE,
+                       help=f"排版样式，默认 {DEFAULT_STYLE}，可选: {', '.join(STYLES)}")
     p_pub.add_argument("--open", action="store_true", help="发布后用浏览器打开分享链接")
     p_pub.set_defaults(func=cmd_publish)
 

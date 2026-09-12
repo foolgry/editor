@@ -18,7 +18,11 @@ description: 公众号 Markdown 编辑器线上发布技能。当用户需要把
 ### 1. 发布本地 Markdown 文件（最常用）
 
 ```bash
-python3 publish.py publish --file article.md --style wechat-default
+# 默认使用 kami-slides 样式（无需传 --style）
+python3 publish.py publish --file article.md
+
+# 或指定其他样式
+python3 publish.py publish --file article.md --style latepost-depth
 ```
 
 - 文件中的**本地图片会自动上传到服务器**，引用自动改写为线上 URL，无需手动处理。
@@ -28,9 +32,10 @@ python3 publish.py publish --file article.md --style wechat-default
 ### 2. 发布纯文本内容
 
 ```bash
+# 默认使用 kami-slides 样式
 python3 publish.py publish --text "# 标题\n正文内容"
 
-# 或管道输入
+# 或管道输入并指定样式
 cat article.md | python3 publish.py publish --style wechat-tech
 ```
 
@@ -68,18 +73,27 @@ WXMD_LIST_PASSWORD=xxx python3 publish.py delete <id>
 | `wechat-tech` | 技术风格 |
 | `wechat-elegant` | 优雅简约 |
 | `wechat-deepread` | 深度阅读 |
+| `wechat-nyt` | 纽约时报 |
 | `wechat-jonyive` | Jony Ive |
+| `wechat-medium` | Medium 长文 |
 | `wechat-apple` | Apple 极简 |
 | `kenya-emptiness` | 原研哉·空 |
 | `hische-editorial` | Hische·编辑部 |
 | `ando-concrete` | 安藤·清水 |
 | `gaudi-organic` | 高迪·有机 |
-| `kami` | Kami |
+| `kami-resume` | Kami · 简历 |
+| `kami-print` | Kami · 白底单页 |
+| `kami-report` | Kami · 财报研报 |
+| `kami-slides` | Kami · 演讲文稿 |
+| `kami-product` | Kami · 产品简报 |
+| `kami-letter` | Kami · 正式信函 |
+| `kami-changelog` | Kami · 更新日志 |
+| `kami-portfolio` | Kami · 沉静画册 |
 | `guardian` | Guardian 卫报 |
 | `nikkei` | Nikkei 日経 |
 | `lemonde` | Le Monde 世界报 |
 
-用户未指定时用 `wechat-default`；拿不准时问用户或直接给默认，发布后用户可在线上编辑器切换样式预览。
+用户未指定时默认使用 `kami-slides`（Kami · 演讲文稿）；若用户明确指定了样式（或提出了特定的排版风格要求），则使用用户指定的样式。发布后用户也可在线上编辑器切换样式预览。
 
 ## 环境变量
 

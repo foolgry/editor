@@ -72,7 +72,7 @@ source ~/.zshrc
 ### 场景 1: 发布 Markdown 文件并生成分享链接
 
 ```bash
-python3 "$SKILLS_DIR/wechat-markdown-editor/scripts/publish.py" publish --file article.md --style wechat-default
+python3 "$SKILLS_DIR/wechat-markdown-editor/scripts/publish.py" publish --file article.md
 ```
 
 文件中的本地图片会自动上传到服务器并改写引用。
