@@ -1875,7 +1875,7 @@ func generateSharePageHTML(share Share) string {
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="alternate icon" href="/favicon.svg">
   <link rel="mask-icon" href="/favicon.svg" color="#0066FF">
-  
+
   <!-- 代码高亮样式（自托管） -->
   <link rel="stylesheet" href="/lib/vendor/atom-one-dark.min.css">
 
