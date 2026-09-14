@@ -15,11 +15,11 @@ ENV GOSUMDB=sum.golang.google.cn
 
 RUN go mod download
 
-# 复制源码
-COPY main.go .
+# 复制源码（包内含多个 go 文件，整目录复制）
+COPY *.go .
 
 # 构建
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o server main.go
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o server .
 
 # 运行阶段
 FROM alpine:latest
