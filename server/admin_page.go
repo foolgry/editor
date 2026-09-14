@@ -38,7 +38,7 @@ func generateListPageHTML() string {
       color: var(--text);
     }
     .container {
-      max-width: 1080px;
+      max-width: 1200px;
       margin: 0 auto;
       background: var(--card);
       border: 1px solid var(--border);
@@ -202,6 +202,9 @@ func generateListPageHTML() string {
       gap: 6px;
       flex-wrap: wrap;
     }
+    /* 分享列表：列宽由 colgroup 决定，标题列吃掉剩余宽度并保底 200px */
+    .shares-table { table-layout: fixed; min-width: 1150px; }
+    .shares-table td.nowrap, .shares-table th.nowrap { white-space: nowrap; }
     /* 项目详情展开行 */
     .detail-cell {
       background: #f9fafb;
@@ -554,14 +557,14 @@ func generateListPageHTML() string {
             ? "<button class='btn-ghost btn-sm' data-action='detach' data-id='" + id + "'>移出项目</button>"
             : "";
           return "<tr>" +
-            "<td style='width:110px;'><a href='/s/" + id + "' target='_blank' rel='noopener noreferrer'>" + id + "</a></td>" +
+            "<td class='nowrap'><a href='/s/" + id + "' target='_blank' rel='noopener noreferrer'>" + id + "</a></td>" +
             "<td>" + title + "</td>" +
-            "<td style='width:110px;'>" + style + "</td>" +
-            "<td style='width:130px;'>" + projectName + "</td>" +
-            "<td style='width:110px;'>" + creator + "</td>" +
-            "<td style='width:160px;'>" + createdAt + "</td>" +
-            "<td style='width:160px;'>" + updatedAt + "</td>" +
-            "<td style='width:210px;'><div class='ops'>" +
+            "<td class='nowrap'>" + style + "</td>" +
+            "<td>" + projectName + "</td>" +
+            "<td>" + creator + "</td>" +
+            "<td class='nowrap'>" + createdAt + "</td>" +
+            "<td class='nowrap'>" + updatedAt + "</td>" +
+            "<td><div class='ops'>" +
             "<button class='btn-ghost btn-sm' data-action='attach' data-id='" + id +
             "' data-title='" + escapeHTML(item.title || item.id) + "' data-project-id='" + escapeHTML(item.projectId || "") + "'>挂载/移动</button>" +
             detachBtn +
@@ -570,7 +573,18 @@ func generateListPageHTML() string {
             "</tr>";
         }).join("");
 
-        tableWrapEls.shares.innerHTML = "<table style='min-width:1020px;'>" +
+        // 除标题列外都固定宽度，标题列吃掉剩余宽度，避免标题被挤成竖排
+        tableWrapEls.shares.innerHTML = "<table class='shares-table'>" +
+          "<colgroup>" +
+          "<col style='width:88px;'>" +
+          "<col>" +
+          "<col style='width:120px;'>" +
+          "<col style='width:132px;'>" +
+          "<col style='width:100px;'>" +
+          "<col style='width:160px;'>" +
+          "<col style='width:160px;'>" +
+          "<col style='width:190px;'>" +
+          "</colgroup>" +
           "<thead><tr><th>ID</th><th>标题</th><th>样式</th><th>所属项目</th><th>创建者</th><th>创建时间</th><th>更新时间</th><th>操作</th></tr></thead>" +
           "<tbody>" + rows + "</tbody>" +
           "</table>";
