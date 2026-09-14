@@ -6,7 +6,8 @@ package main
 //     凭证存 localStorage（wx-admin-credential），刷新自动登录；任何请求 401 时
 //     清状态回登录页并提示"凭证已失效"；
 //   - 三个标签页：分享（挂载/移动项目、移出项目、删除）、项目（新建、查看内含
-//     文章、重命名、删除）、令牌（签发/吊销，仅主密码身份可见）；
+//     文章、重命名、删除、打开项目聚合链接 /p/<id>）、令牌（签发/吊销，仅主密码
+//     身份可见）；
 //   - vanilla JS 无框架，视觉沿用原分享列表页（卡片 + 表格）；所有动态值插入
 //     HTML 前一律经过 escapeHTML 转义，不使用模板字符串拼接用户数据。
 func generateListPageHTML() string {
@@ -735,8 +736,11 @@ func generateListPageHTML() string {
           var creator = escapeHTML(p.creatorTokenName || "站长");
           var lastShareAt = escapeHTML(formatDate(p.lastShareAt));
           var createdAt = escapeHTML(formatDate(p.createdAt));
+          // 项目链接（/p/<id>）是给读者的聚合入口，独立成列便于直接打开或复制
           return "<tr data-project-row='" + id + "'>" +
             "<td>" + name + "</td>" +
+            "<td style='width:112px; white-space:nowrap;'><a href='/p/" + id +
+            "' target='_blank' rel='noopener noreferrer'>/p/" + id + "</a></td>" +
             "<td style='width:70px;'>" + p.shareCount + "</td>" +
             "<td style='width:160px;'>" + lastShareAt + "</td>" +
             "<td style='width:110px;'>" + creator + "</td>" +
@@ -749,8 +753,8 @@ func generateListPageHTML() string {
             "</tr>";
         }).join("");
 
-        tableWrapEls.projects.innerHTML = "<table style='min-width:860px;'>" +
-          "<thead><tr><th>名称</th><th>文章数</th><th>最新更新</th><th>创建者</th><th>创建时间</th><th>操作</th></tr></thead>" +
+        tableWrapEls.projects.innerHTML = "<table style='min-width:980px;'>" +
+          "<thead><tr><th>名称</th><th>链接</th><th>文章数</th><th>最新更新</th><th>创建者</th><th>创建时间</th><th>操作</th></tr></thead>" +
           "<tbody>" + rows + "</tbody>" +
           "</table>";
       }
@@ -799,7 +803,7 @@ func generateListPageHTML() string {
         if (!row) return;
         var tr = document.createElement("tr");
         tr.setAttribute("data-project-detail", projectId);
-        tr.innerHTML = "<td colspan='6' class='detail-cell'><div class='muted'>正在加载文章列表...</div></td>";
+        tr.innerHTML = "<td colspan='7' class='detail-cell'><div class='muted'>正在加载文章列表...</div></td>";
         row.after(tr);
 
         try {
@@ -807,7 +811,7 @@ func generateListPageHTML() string {
           var res = await apiFetch("/api/projects/" + encodeURIComponent(projectId));
           var shares = (res.data && res.data.shares) || [];
           if (!shares.length) {
-            tr.innerHTML = "<td colspan='6' class='detail-cell'><div class='muted'>该项目暂无文章</div></td>";
+            tr.innerHTML = "<td colspan='7' class='detail-cell'><div class='muted'>该项目暂无文章</div></td>";
             return;
           }
           var listHTML = shares.map(function (s) {
@@ -823,13 +827,13 @@ func generateListPageHTML() string {
               "' data-project-id='" + escapeHTML(projectId) + "'>移除</button>" +
               "</div>";
           }).join("");
-          tr.innerHTML = "<td colspan='6' class='detail-cell'>" + listHTML + "</td>";
+          tr.innerHTML = "<td colspan='7' class='detail-cell'>" + listHTML + "</td>";
         } catch (error) {
           if (!credential) {
             tr.remove();
             return;
           }
-          tr.innerHTML = "<td colspan='6' class='detail-cell'><div class='error'>" + escapeHTML(error.message) + "</div></td>";
+          tr.innerHTML = "<td colspan='7' class='detail-cell'><div class='error'>" + escapeHTML(error.message) + "</div></td>";
         }
       }
 
