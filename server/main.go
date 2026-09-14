@@ -86,6 +86,10 @@ var listPagePassword string
 
 const listPasswordHeader = "X-List-Password"
 
+// applyPagePath 令牌申请页路径。凭证缺失或无效时随 401 一起返回，编辑器与 skill
+// 据此把发布者引到申请页，而不是只给一句“未授权”。
+const applyPagePath = "/apply"
+
 type ShareListItem struct {
 	ID               string    `json:"id"`
 	Title            string    `json:"title"`
@@ -139,6 +143,7 @@ func main() {
 	mux.HandleFunc("/s/", handleSharePage)
 	mux.HandleFunc("/list", handleListPage)
 	mux.HandleFunc("/p/", handleProjectPage)
+	mux.HandleFunc(applyPagePath, handleApplyPage)
 
 	// 静态文件服务
 	staticDir := resolveStaticDir()
@@ -303,7 +308,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// handleCreateShare 创建分享（不带 project 保持匿名公开；带 project 需要令牌或主密码）
+// handleCreateShare 创建分享。发布属于写操作，本站不开放匿名发布：
+// 必须携带有效凭证（令牌或站长主密码），缺失或无效一律 401。
 func handleCreateShare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -326,31 +332,20 @@ func handleCreateShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 归入项目：请求一旦涉及项目就必须携带凭证（令牌或主密码）。
-	// projectId 精确匹配已有项目（编辑器/管理页下拉场景）；project 按名字解析、
-	// 不存在自动创建（ADR-0003 的 Agent 语义）。两者都给时 projectId 优先。
+	// 凭证校验失败绝不降级为匿名发布：否则客户端随手伪造一个令牌也能发布成功，
+	// 凭证形同虚设，发布者也无从追溯（CONTEXT.md：发布者为站长及其授权的 Agent）。
+	auth, authed := authenticate(r)
+	if !authed {
+		respondUnauthorized(w, r, "发布")
+		return
+	}
+
+	// 归入项目：projectId 精确匹配已有项目（编辑器/管理页下拉场景）；project 按名字
+	// 解析、不存在自动创建（ADR-0003 的 Agent 语义）。两者都给时 projectId 优先。
 	projectName := strings.TrimSpace(req.Project)
 	projectID := strings.TrimSpace(req.ProjectID)
 	var project *Project
-	var creatorTokenID interface{} // 令牌身份时记录创建者，匿名/主密码时为 NULL
-
-	// 可选认证：带有效令牌发布的独立单篇也记录归属（CONTEXT.md：每篇分享归属于
-	// 创建它的那个令牌），无凭证保持真匿名；涉及项目时凭证为必需
-	var auth AuthContext
-	var authed bool
-	if projectName != "" || projectID != "" || r.Header.Get("Authorization") != "" {
-		var a AuthContext
-		var ok bool
-		if a, ok = authenticate(r); ok {
-			auth, authed = a, true
-		}
-	}
-	if (projectName != "" || projectID != "") && !authed {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
-			"error": "归入项目需要令牌",
-		})
-		return
-	}
+	var creatorTokenID interface{} // 令牌身份记录创建者；主密码（站长）发布时为 NULL
 
 	if projectName != "" || projectID != "" {
 		if projectID != "" {
@@ -389,7 +384,7 @@ func handleCreateShare(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// 令牌身份（无论是否归入项目）都记录创建者；主密码发布的单篇归属站长（NULL）
-	if authed && !auth.IsOwner {
+	if !auth.IsOwner {
 		creatorTokenID = auth.TokenID
 	}
 
@@ -649,7 +644,7 @@ func handleDeleteShareByID(w http.ResponseWriter, r *http.Request, shareID strin
 	})
 }
 
-// canOperateShare 分享操作权限：主密码任意；无创建者（匿名/主密码发布）的分享仅主密码
+// canOperateShare 分享操作权限：主密码任意；无创建者（主密码发布的单篇）的分享仅主密码
 // 可操作；令牌仅可操作本人创建的分享（ADR-0002：令牌管自己名下的，主密码管一切）
 func canOperateShare(auth AuthContext, creatorTokenID sql.NullString) bool {
 	if auth.IsOwner {
@@ -1347,6 +1342,26 @@ func requireOwner(w http.ResponseWriter, r *http.Request) (AuthContext, bool) {
 	return auth, true
 }
 
+// hasCredential 判断请求是否携带了任一凭证载体（只看有没有，不看是否有效）
+func hasCredential(r *http.Request) bool {
+	return strings.TrimSpace(r.Header.Get("Authorization")) != "" ||
+		strings.TrimSpace(r.Header.Get(listPasswordHeader)) != ""
+}
+
+// respondUnauthorized 凭证缺失或无效时的统一 401 响应。
+// action 用于说明是什么操作需要凭证（发布/上传图片）。响应里始终带 applyUrl，
+// 让客户端能直接给出申请入口；凭证无效与缺失分开提示，是给配错令牌的自己人看的。
+func respondUnauthorized(w http.ResponseWriter, r *http.Request, action string) {
+	message := action + "需要令牌，请先申请"
+	if hasCredential(r) {
+		message = "凭证无效或已被吊销，请更换令牌后重试"
+	}
+	respondJSON(w, http.StatusUnauthorized, map[string]string{
+		"error":    message,
+		"applyUrl": applyPagePath,
+	})
+}
+
 // handleTokens 令牌集合入口：GET 列表 / POST 签发（均仅主密码）
 func handleTokens(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -1781,6 +1796,12 @@ func resolveUploadsDir() string {
 func handleUploadImage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 上传是写操作：与发布同口径，必须携带有效凭证，否则任何人都能往服务器塞图片
+	if _, ok := authenticate(r); !ok {
+		respondUnauthorized(w, r, "上传图片")
 		return
 	}
 

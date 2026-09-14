@@ -85,6 +85,7 @@ const editorApp = createApp({
       projectSectionExpanded: false, // "归入项目"折叠区展开状态（默认折叠）
       shareToken: '',               // 已保存的分享令牌（localStorage: wx-editor-token）
       shareTokenInput: '',          // 令牌输入框内容
+      tokenValidating: false,       // 令牌校验中（保存前先确认有效性）
       projects: [],                 // 自己名下的项目列表
       projectsLoading: false,       // 项目列表加载中
       selectedProject: '',          // 下拉选中项目的 ID（'' = 不归入项目）

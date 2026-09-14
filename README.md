@@ -34,8 +34,9 @@
 
 - 将文章生成短链接，发送给他人查看
 - 保留当前主题样式
+- **发布需要令牌**：本站不开放匿名发布，网页编辑器与 Skill 发布都必须携带有效令牌（或站长主密码），图片上传同样要求令牌；没有令牌时可到 `/apply` 申请
 - 分享管理列表（`/list`，需密码）
-- 图片上传接口（`/api/upload`），供 Skill 发布本地图片
+- 图片上传接口（`/api/upload`），供 Skill 发布本地图片（需令牌）
 - **注意**：分享内容保存在服务器 SQLite 数据库中（`server/data/shares.db`），上传的图片保存在 `server/data/uploads/`
 
 ## 快速开始
@@ -94,26 +95,29 @@ cp -r /tmp/editor/skills/wechat-markdown-editor ~/.agents/skills/
 ### 快速使用
 
 ```bash
-# 发布本地 Markdown 文件（本地图片自动上传）
-python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md
+# 发布本地 Markdown 文件（本地图片自动上传；需要令牌）
+WXMD_TOKEN=wmt_xxx python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md
 
 # 发布纯文本
-python3 skills/wechat-markdown-editor/scripts/publish.py publish --text "# 标题"
+WXMD_TOKEN=wmt_xxx python3 skills/wechat-markdown-editor/scripts/publish.py publish --text "# 标题"
 
 # 发布后用浏览器打开
-python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md --open
+WXMD_TOKEN=wmt_xxx python3 skills/wechat-markdown-editor/scripts/publish.py publish --file article.md --open
 
-# 获取/列出/删除分享（list/delete 需要 WXMD_LIST_PASSWORD）
+# 获取/列出/删除分享（list/delete 需要 WXMD_TOKEN 或 WXMD_LIST_PASSWORD）
 python3 skills/wechat-markdown-editor/scripts/publish.py get <share-id>
 ```
 
 输出 JSON：`{"id", "url", "style", "uploadedImages"}`，`url` 即分享链接。
 
+没有令牌时，发布和图片上传都会被服务端拒绝（401），错误信息里会给出申请入口；也可以直接访问 `<API 地址>/apply` 申请。
+
 ### 环境变量
 
 - `WXMD_API_URL` - API 服务器地址（默认：`https://md.foolgry.top`）
 - `WXMD_API_TIMEOUT` - 请求超时（秒，默认：30）
-- `WXMD_LIST_PASSWORD` - 列表/删除操作的管理密码
+- `WXMD_TOKEN` - 发布与项目操作的令牌（从 `/apply` 申请，由站长在管理页签发）
+- `WXMD_LIST_PASSWORD` - 列表/删除操作的管理密码；未设 `WXMD_TOKEN` 时也作为发布凭证回退
 
 ### 相关文档
 

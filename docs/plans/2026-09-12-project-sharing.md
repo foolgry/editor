@@ -37,6 +37,8 @@
 - 项目名在**同一创建者内部唯一**；不同创建者可重名（ADR-0003）。
 - 读操作（看分享、看项目）完全公开；**一切写操作需要令牌**，发布独立单篇除外（保持现状匿名公开）。
 
+> 后续修订（2026-09-14）：上面最后一句已作废，见 [ADR-0004](../adr/0004-token-required-for-publishing.md)——现在**任何发布都需要令牌**，独立单篇不再匿名公开。
+
 ## 3. 数据模型
 
 ### `projects` 表（新增）
@@ -63,7 +65,7 @@
 ### `shares` 表（变更）
 
 - 新增 `project_id`（可空，外键 → projects.id）。
-- 新增 `creator_token_id`（可空——匿名发布的单篇没有创建者）。
+- 新增 `creator_token_id`（可空——站长用主密码发布的单篇没有创建者令牌）。
 - 预留 `sort_order` 字段位（不实现 UI，为将来手动排序留余地）。
 
 ### 迁移
@@ -103,6 +105,8 @@
 - 已设令牌：项目下拉（仅列自己名下项目）+ 输入新名字即发布时自动创建。
 - 匿名访客体验零变化。
 
+> 后续修订（2026-09-14）：本节已作废，见 [ADR-0004](../adr/0004-token-required-for-publishing.md)——分享弹层现在无条件要求令牌，未设令牌时展示申请入口，"分享按钮照常发独立单篇"与"匿名访客体验零变化"不再成立。
+
 ### 管理页（`/list` 升级）
 
 - 登录：站长主密码**或任一有效令牌**。令牌登录只见自己名下内容；主密码见全部。
@@ -140,13 +144,15 @@
 ## 8. skill（publish.py）变更
 
 ```bash
-python3 publish.py publish --file report.md --project 服务器巡检   # 核心路径
+WXMD_TOKEN=xxx python3 publish.py publish --file report.md --project 服务器巡检   # 核心路径
 python3 publish.py projects                                        # 列出项目
 python3 publish.py project-create 服务器巡检
 python3 publish.py project-rename 旧名 新名
 python3 publish.py attach <share-id> --project 服务器巡检
 python3 publish.py detach <share-id>
 ```
+
+> 注（2026-09-14）：所有命令现在都要求 `WXMD_TOKEN`（见 [ADR-0004](../adr/0004-token-required-for-publishing.md)）。
 
 - 认证：新增环境变量 `WXMD_TOKEN`；旧 `WXMD_LIST_PASSWORD` 继续兼容（视作站长主凭证）。
 - publish 输出 JSON 增加字段：

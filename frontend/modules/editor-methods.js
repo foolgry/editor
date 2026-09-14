@@ -2272,12 +2272,34 @@ const markdown = \`![图片](img://\${imageId})\`;
       await this.loadProjects({ silent: true });
     },
 
-    // 保存令牌到 localStorage，并立即拉取项目列表
+    // 保存令牌：先向服务端验一次有效性，再落 localStorage。
+    // 直接存下来会让坏令牌被长期记住，用户每次发布都失败却看不出原因。
     async saveShareToken() {
       const token = (this.shareTokenInput || '').trim();
       if (!token) {
         this.showToast('请输入令牌', 'error');
         return;
+      }
+
+      this.tokenValidating = true;
+      try {
+        const response = await fetch(`${this.shareServerUrl}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          this.shareError = '令牌无效或已被吊销，请重新申请令牌';
+          this.showToast('令牌无效或已被吊销', 'error');
+          return;
+        }
+      } catch (error) {
+        console.error('校验令牌失败:', error);
+        this.showToast('校验令牌失败，请检查网络后重试', 'error');
+        return;
+      } finally {
+        this.tokenValidating = false;
       }
 
       try {
@@ -2290,6 +2312,7 @@ const markdown = \`![图片](img://\${imageId})\`;
 
       this.shareToken = token;
       this.shareTokenInput = '';
+      this.shareError = null;
       this.showToast('令牌已保存', 'success');
 
       await this.loadProjects();
@@ -2300,20 +2323,11 @@ const markdown = \`![图片](img://\${imageId})\`;
       this.removeShareTokenFromStorage();
       this.shareToken = '';
       this.shareTokenInput = '';
+      this.shareError = null;
       this.projects = [];
       this.selectedProject = '';
       this.newProjectName = '';
-      this.projectSectionExpanded = true;
-    },
-
-    // 清除令牌（回到匿名分享）
-    clearShareToken() {
-      this.removeShareTokenFromStorage();
-      this.shareToken = '';
-      this.shareTokenInput = '';
-      this.projects = [];
-      this.selectedProject = '';
-      this.newProjectName = '';
+      this.projectSectionExpanded = false;
     },
 
     removeShareTokenFromStorage() {
@@ -2382,16 +2396,16 @@ const markdown = \`![图片](img://\${imageId})\`;
       }
 
       const newProjectName = (this.newProjectName || '').trim();
-      // 新项目名有值时优先于下拉选择；均为空则发布独立单篇（匿名，与现状一致）
+      // 新项目名有值时优先于下拉选择；均为空则发布独立单篇（仍需令牌）
       const selectedProjectId = !newProjectName ? (this.selectedProject || '') : '';
       // 展示/判断用的项目名（新名或下拉选中项目的名字）
       const projectName = newProjectName || this.getProjectNameById(selectedProjectId);
 
-      // 选择了项目但未设令牌（正常 UI 不会出现，防御处理）
-      if (projectName && !this.shareToken) {
-        this.shareError = '归入项目需要先设置令牌';
-        this.projectSectionExpanded = true;
-        this.showToast('归入项目需要先设置令牌', 'error');
+      // 本站已关闭匿名发布：任何发布都必须带令牌，服务端同样会强制校验
+      if (!this.shareToken) {
+        this.shareError = '发布需要令牌，请先申请并保存令牌';
+        this.projectSectionExpanded = false;
+        this.showToast('发布需要令牌，请先申请', 'error');
         return;
       }
 
@@ -2404,19 +2418,20 @@ const markdown = \`![图片](img://\${imageId})\`;
           content: shareContent,
           style: this.currentStyle
         };
+        // 所有发布都带令牌：独立单篇也需要（服务端据令牌记录创建者）
         const requestHeaders = {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.shareToken}`
         };
 
-        // 仅在归入项目时携带项目字段与令牌；匿名路径不带 Authorization。
-        // 下拉已有项目按 id 精确挂载（跨创建者同名时不会挂错），新名走服务端自动创建
+        // 归入项目时附带项目字段。下拉已有项目按 id 精确挂载（跨创建者同名时不会
+        // 挂错），新名走服务端自动创建
         if (projectName) {
           if (selectedProjectId) {
             requestBody.projectId = selectedProjectId;
           } else {
             requestBody.project = projectName;
           }
-          requestHeaders['Authorization'] = `Bearer ${this.shareToken}`;
         }
 
         const response = await fetch(`${this.shareServerUrl}/api/share`, {
@@ -2428,11 +2443,18 @@ const markdown = \`![图片](img://\${imageId})\`;
         const data = await response.json();
 
         if (!response.ok) {
-          // 令牌无效：提示并自动展开折叠区，便于更换令牌
-          if ((response.status === 401 || response.status === 403) && projectName) {
-            this.shareError = '令牌无效或已吊销，请更换令牌';
-            this.projectSectionExpanded = true;
-            this.showToast('令牌无效或已吊销，请更换令牌', 'error');
+          // 令牌失效/被吊销：清掉本地令牌回到输入态，露出申请入口，
+          // 否则用户会反复点发布却一直在同一个错误上打转
+          if (response.status === 401 || response.status === 403) {
+            // 服务端的文案已说明原因与动作，这里不再拼接，避免重复；上方的
+            // 令牌区会随 shareToken 清空自动变回申请入口
+            this.removeShareTokenFromStorage();
+            this.shareToken = '';
+            this.projects = [];
+            this.selectedProject = '';
+            this.newProjectName = '';
+            this.shareError = (data && data.error) || '令牌无效或已被吊销，请更换令牌';
+            this.showToast(this.shareError, 'error');
             return;
           }
           throw new Error(data.error || '分享失败');

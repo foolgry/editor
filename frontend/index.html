@@ -1089,6 +1089,32 @@
       margin: 0 0 16px;
     }
 
+    /* 令牌门禁：未设令牌时先看到这一块，需令牌才能发布 */
+    .share-token-gate {
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      background: var(--color-bg);
+    }
+
+    .share-token-gate-title {
+      margin: 0 0 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+
+    .share-token-apply-link {
+      color: var(--color-accent);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .share-token-apply-link:hover {
+      text-decoration: underline;
+    }
+
     /* 归入项目折叠区 */
     .project-collapse-toggle {
       display: flex;
@@ -1209,6 +1235,7 @@
       align-items: center;
       gap: 10px;
       padding: 8px 0 6px;
+      margin-bottom: 8px;
     }
 
     .project-token-status-text {
@@ -2612,10 +2639,49 @@
           <button class="project-modal-close" @click="closeShareSettings" :disabled="sharing">×</button>
         </div>
         <div class="project-modal-body">
-          <p class="project-modal-desc">生成链接后即可发送；也可归入项目，持续更新同一聚合页。</p>
+          <p class="project-modal-desc">发布需要令牌；也可归入项目，持续更新同一聚合页。</p>
 
-          <!-- 归入项目折叠区（默认折叠） -->
-          <div class="project-section">
+          <!-- 令牌区：本站已关闭匿名发布，没有令牌无法生成链接 -->
+          <div v-if="!shareToken" class="share-token-gate">
+            <p class="share-token-gate-title">需要令牌才能发布</p>
+            <p class="project-hint">
+              网页编辑器和 skill 都要求令牌，令牌由站长签发。
+              还没有令牌？<a
+                class="share-token-apply-link"
+                :href="resolveShareUrl('/apply')"
+                target="_blank"
+                rel="noopener noreferrer"
+              >前往申请令牌</a>，拿到后粘贴到下面，浏览器会记住。
+            </p>
+            <div class="project-token-row">
+              <input
+                type="text"
+                v-model="shareTokenInput"
+                placeholder="粘贴令牌"
+                @keyup.enter="saveShareToken"
+              >
+              <button
+                type="button"
+                class="project-token-save-btn"
+                @click="saveShareToken"
+                :disabled="!shareTokenInput.trim() || tokenValidating"
+              >{{ tokenValidating ? '校验中...' : '保存令牌' }}</button>
+            </div>
+          </div>
+
+          <div v-else class="project-token-status">
+            <span class="project-token-status-text">令牌已设置</span>
+            <a
+              class="share-token-apply-link"
+              :href="resolveShareUrl('/apply')"
+              target="_blank"
+              rel="noopener noreferrer"
+            >申请新令牌</a>
+            <button type="button" class="project-token-action-btn" @click="changeShareToken">更换</button>
+          </div>
+
+          <!-- 归入项目折叠区（默认折叠，已设令牌后可用） -->
+          <div v-if="shareToken" class="project-section">
             <button
               type="button"
               class="project-collapse-toggle"
@@ -2629,51 +2695,24 @@
             </button>
 
             <div v-if="projectSectionExpanded" class="project-collapse-body">
-              <!-- 未设令牌 -->
-              <template v-if="!shareToken">
-                <p class="project-hint">设置令牌后可归入项目（令牌由站长在管理页签发）</p>
-                <div class="project-token-row">
-                  <input
-                    type="text"
-                    v-model="shareTokenInput"
-                    placeholder="输入令牌"
-                    @keyup.enter="saveShareToken"
-                  >
-                  <button
-                    type="button"
-                    class="project-token-save-btn"
-                    @click="saveShareToken"
-                    :disabled="!shareTokenInput.trim() || projectsLoading"
-                  >保存令牌</button>
-                </div>
-              </template>
-
-              <!-- 已设令牌 -->
-              <template v-else>
-                <div class="project-field">
-                  <label class="project-field-label" for="project-select">项目</label>
-                  <select id="project-select" v-model="selectedProject" :disabled="projectsLoading">
-                    <option value="">不归入项目（独立单篇）</option>
-                    <option v-for="project in projects" :key="project.id" :value="project.id">
-                      {{ project.name }}（{{ project.shareCount }} 篇）
-                    </option>
-                  </select>
-                </div>
-                <div class="project-field">
-                  <label class="project-field-label" for="project-new-name">或输入新项目名</label>
-                  <input
-                    id="project-new-name"
-                    type="text"
-                    v-model="newProjectName"
-                    placeholder="填写后将创建新项目并优先使用"
-                  >
-                </div>
-                <div class="project-token-status">
-                  <span class="project-token-status-text">已设令牌</span>
-                  <button type="button" class="project-token-action-btn" @click="changeShareToken">更换</button>
-                  <button type="button" class="project-token-action-btn" @click="clearShareToken">清除</button>
-                </div>
-              </template>
+              <div class="project-field">
+                <label class="project-field-label" for="project-select">项目</label>
+                <select id="project-select" v-model="selectedProject" :disabled="projectsLoading">
+                  <option value="">不归入项目（独立单篇）</option>
+                  <option v-for="project in projects" :key="project.id" :value="project.id">
+                    {{ project.name }}（{{ project.shareCount }} 篇）
+                  </option>
+                </select>
+              </div>
+              <div class="project-field">
+                <label class="project-field-label" for="project-new-name">或输入新项目名</label>
+                <input
+                  id="project-new-name"
+                  type="text"
+                  v-model="newProjectName"
+                  placeholder="填写后将创建新项目并优先使用"
+                >
+              </div>
             </div>
           </div>
 

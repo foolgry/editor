@@ -2,7 +2,7 @@
 """wxmd-publish - 公众号 Markdown 编辑器线上发布工具（纯 HTTP，零依赖）。
 
 子命令：
-  publish        发布 Markdown 内容，返回分享链接（本地图片自动上传并改写引用）
+  publish        发布 Markdown 内容，返回分享链接（图片自动上传并改写引用）
   get            获取分享内容
   list           列出全部分享（需要 WXMD_LIST_PASSWORD 或 WXMD_TOKEN）
   delete         删除分享（需要 WXMD_LIST_PASSWORD 或 WXMD_TOKEN）
@@ -12,11 +12,15 @@
   attach         把分享挂载到项目（需要 WXMD_TOKEN）
   detach         把分享移出项目（需要 WXMD_TOKEN）
 
+本站已关闭匿名发布：publish 及其图片上传都必须带令牌，未设置 WXMD_TOKEN 会直接
+报错（主密码 WXMD_LIST_PASSWORD 可作为站长凭证回退）。还没有令牌时到
+<API 地址>/apply 申请。
+
 环境变量：
   WXMD_API_URL        API 地址，默认 https://md.foolgry.top
   WXMD_API_TIMEOUT    请求超时秒数，默认 30
-  WXMD_TOKEN          项目相关操作的令牌，优先于 WXMD_LIST_PASSWORD
-  WXMD_LIST_PASSWORD  列表/删除的管理密码；项目相关操作未设 WXMD_TOKEN 时
+  WXMD_TOKEN          发布/项目相关操作的令牌，优先于 WXMD_LIST_PASSWORD
+  WXMD_LIST_PASSWORD  列表/删除的管理密码；发布与项目相关操作未设 WXMD_TOKEN 时
                       回退用它（主密码视作站长凭证）
 """
 
@@ -107,6 +111,32 @@ def absolute_url(base, path):
     return f"{base}/{path.lstrip('/')}"
 
 
+def origin_of(url):
+    """从 API URL 反推服务地址，用于把服务端返回的 applyUrl 拼成完整链接。"""
+    marker = "/api/"
+    if marker in url:
+        return url.split(marker, 1)[0]
+    return url.rstrip("/")
+
+
+def format_http_error(code, body_text, url):
+    """把服务端错误体整理成提示。凭证类失败会带 applyUrl，拼成完整申请链接，
+    否则使用者只会看到一句“未授权”，不知道该去哪里拿令牌。"""
+    data = {}
+    try:
+        parsed = json.loads(body_text)
+        if isinstance(parsed, dict):
+            data = parsed
+    except ValueError:
+        pass
+
+    msg = data.get("error") or body_text
+    apply_path = data.get("applyUrl")
+    if apply_path:
+        msg = f"{msg}（申请令牌：{origin_of(url)}{apply_path}）"
+    return f"HTTP {code}: {msg}"
+
+
 def http_json(url, method="GET", payload=None, headers=None):
     data = None
     req_headers = {"Accept": "application/json"}
@@ -120,17 +150,13 @@ def http_json(url, method="GET", payload=None, headers=None):
         with urllib.request.urlopen(req, timeout=timeout()) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        try:
-            msg = json.loads(body).get("error", body)
-        except ValueError:
-            msg = body
-        raise PublishError(f"HTTP {e.code}: {msg}")
+        raise PublishError(format_http_error(
+            e.code, e.read().decode("utf-8", errors="replace"), url))
     except urllib.error.URLError as e:
         raise PublishError(f"无法连接服务器: {e.reason}")
 
 
-def upload_image(base, image_path):
+def upload_image(base, image_path, auth_headers_map=None):
     boundary = f"----wxmd{uuid.uuid4().hex}"
     ext = image_path.suffix.lower()
     mime = MIME_BY_EXT.get(ext, "application/octet-stream")
@@ -146,22 +172,23 @@ def upload_image(base, image_path):
         b"",
     ])
 
+    req_headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    if auth_headers_map:
+        req_headers.update(auth_headers_map)
+
+    url = f"{base}/api/upload"
     req = urllib.request.Request(
-        f"{base}/api/upload",
+        url,
         data=body,
         method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers=req_headers,
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout()) as resp:
             result = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        body_text = e.read().decode("utf-8", errors="replace")
-        try:
-            msg = json.loads(body_text).get("error", body_text)
-        except ValueError:
-            msg = body_text
-        raise PublishError(f"HTTP {e.code}: {msg}")
+        raise PublishError(format_http_error(
+            e.code, e.read().decode("utf-8", errors="replace"), url))
     except urllib.error.URLError as e:
         raise PublishError(f"无法连接服务器: {e.reason}")
 
@@ -190,8 +217,11 @@ def resolve_local_ref(ref, base_dir):
     return None
 
 
-def process_images(content, base_dir, base, warnings):
-    """上传内容中引用的本地图片并把引用改写为线上 URL，返回 (新内容, 上传数)。"""
+def process_images(content, base_dir, base, warnings, auth):
+    """上传内容中引用的本地图片并把引用改写为线上 URL，返回 (新内容, 上传数)。
+
+    auth 为发布凭证请求头：上传接口与发布同口径，未带有效令牌会被拒。
+    """
     cache = {}
     uploaded = 0
 
@@ -206,7 +236,7 @@ def process_images(content, base_dir, base, warnings):
         key = str(path)
         if key not in cache:
             try:
-                cache[key] = base + upload_image(base, path)
+                cache[key] = base + upload_image(base, path, auth)
                 uploaded += 1
             except PublishError as e:
                 warnings.append(f"图片上传失败，已保留原引用: {ref} ({e})")
@@ -251,17 +281,19 @@ def cmd_publish(args):
     if not content.strip():
         raise PublishError("内容不能为空")
 
+    # 本站已关闭匿名发布：先在发布前取好凭证，图片上传和发布都要用它。
+    # 缺少令牌时这里直接失败，不会上传一半再报错。
+    auth = auth_headers(require_token=True, base=base)
+
     warnings = []
-    content, uploaded = process_images(content, base_dir, base, warnings)
+    content, uploaded = process_images(content, base_dir, base, warnings, auth)
 
     payload = {"content": content, "style": args.style}
-    headers = None
     if args.project:
         payload["project"] = args.project
-        headers = auth_headers(require_token=True)
 
     result = http_json(f"{base}/api/share", method="POST",
-                       payload=payload, headers=headers)
+                       payload=payload, headers=auth)
     share_id = result.get("id")
     output = {
         "id": share_id,
@@ -280,14 +312,18 @@ def cmd_publish(args):
         webbrowser.open(output["url"])
 
 
-def auth_headers(require_token=False):
+def auth_headers(require_token=False, base=None):
     """构造认证请求头，优先 WXMD_TOKEN（Bearer），其次 WXMD_LIST_PASSWORD。
 
-    require_token=True：项目相关操作（publish --project、projects、project-create、
-    project-rename、attach、detach），主密码视作站长凭证，同样以 Bearer 发送。
+    require_token=True：发布（含图片上传）与项目相关操作（publish --project、
+    projects、project-create、project-rename、attach、detach），主密码视作站长
+    凭证，同样以 Bearer 发送。
     require_token=False：list/delete，WXMD_TOKEN 以 Bearer 发送；
     WXMD_LIST_PASSWORD 沿用 X-List-Password 头（维持现状）。
+
+    base 有值时，缺少凭证的报错会附上令牌申请入口。
     """
+    apply_hint = f"（申请令牌：{base}/apply）" if base else ""
     token = os.environ.get("WXMD_TOKEN", "").strip()
     if token:
         return {"Authorization": f"Bearer {token}"}
@@ -297,8 +333,8 @@ def auth_headers(require_token=False):
             return {"Authorization": f"Bearer {password}"}
         return {"X-List-Password": password}
     if require_token:
-        raise PublishError("需要令牌：请设置环境变量 WXMD_TOKEN")
-    raise PublishError("需要管理密码：请设置环境变量 WXMD_LIST_PASSWORD")
+        raise PublishError(f"需要令牌：请设置环境变量 WXMD_TOKEN{apply_hint}")
+    raise PublishError(f"需要管理密码：请设置环境变量 WXMD_LIST_PASSWORD{apply_hint}")
 
 
 def cmd_get(args):
@@ -308,20 +344,20 @@ def cmd_get(args):
 
 def cmd_list(args):
     base = base_url(args)
-    print(json.dumps(http_json(f"{base}/api/shares", headers=auth_headers()),
+    print(json.dumps(http_json(f"{base}/api/shares", headers=auth_headers(base=base)),
                      ensure_ascii=False, indent=2))
 
 
 def cmd_delete(args):
     base = base_url(args)
     print(json.dumps(http_json(f"{base}/api/share/{args.id}", method="DELETE",
-                               headers=auth_headers()), ensure_ascii=False, indent=2))
+                               headers=auth_headers(base=base)), ensure_ascii=False, indent=2))
 
 
 def cmd_projects(args):
     base = base_url(args)
     print(json.dumps(http_json(f"{base}/api/projects",
-                               headers=auth_headers(require_token=True)),
+                               headers=auth_headers(require_token=True, base=base)),
                      ensure_ascii=False, indent=2))
 
 
@@ -329,13 +365,13 @@ def cmd_project_create(args):
     base = base_url(args)
     print(json.dumps(http_json(f"{base}/api/projects", method="POST",
                                payload={"name": args.name},
-                               headers=auth_headers(require_token=True)),
+                               headers=auth_headers(require_token=True, base=base)),
                      ensure_ascii=False, indent=2))
 
 
 def cmd_project_rename(args):
     base = base_url(args)
-    headers = auth_headers(require_token=True)
+    headers = auth_headers(require_token=True, base=base)
     data = http_json(f"{base}/api/projects", headers=headers)
     items = data.get("items", []) if isinstance(data, dict) else data
     # 第一个参数允许是项目 ID（同名项目消歧出口）或项目名
@@ -379,14 +415,14 @@ def cmd_attach(args):
     payload = {"projectId": args.project_id} if args.project_id else {"project": args.project}
     result = http_json(f"{base}/api/share/{args.id}/attach", method="POST",
                        payload=payload,
-                       headers=auth_headers(require_token=True))
+                       headers=auth_headers(require_token=True, base=base))
     print_share(result, base)
 
 
 def cmd_detach(args):
     base = base_url(args)
     result = http_json(f"{base}/api/share/{args.id}/detach", method="POST",
-                       headers=auth_headers(require_token=True))
+                       headers=auth_headers(require_token=True, base=base))
     print_share(result, base)
 
 
@@ -403,13 +439,13 @@ def main():
     parser.add_argument("--base-url", help=f"API 地址，默认 {DEFAULT_BASE_URL}")
     sub = parser.add_subparsers(dest="command")
 
-    p_pub = sub.add_parser("publish", help="发布 Markdown 内容，返回分享链接")
-    p_pub.add_argument("--file", help="本地 Markdown 文件路径（本地图片会自动上传）")
+    p_pub = sub.add_parser("publish", help="发布 Markdown 内容，返回分享链接（需要 WXMD_TOKEN）")
+    p_pub.add_argument("--file", help="本地 Markdown 文件路径（本地图片自动上传，同样需要令牌）")
     p_pub.add_argument("--text", help="直接传入 Markdown 文本")
     p_pub.add_argument("--style", default=DEFAULT_STYLE,
                        help=f"排版样式，默认 {DEFAULT_STYLE}，可选: {', '.join(STYLES)}")
     p_pub.add_argument("--project",
-                       help="归入项目（按名字引用，不存在自动创建；需要 WXMD_TOKEN）")
+                       help="归入项目（按名字引用，不存在自动创建）")
     p_pub.add_argument("--open", action="store_true", help="发布后用浏览器打开分享链接")
     p_pub.set_defaults(func=cmd_publish)
 

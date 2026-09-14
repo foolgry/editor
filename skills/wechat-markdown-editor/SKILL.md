@@ -1,6 +1,6 @@
 ---
 name: wechat-markdown-editor
-description: 公众号 Markdown 编辑器线上发布技能。当用户需要把 Markdown 文章发布为排版精美的微信公众号格式、生成可分享的在线链接时使用。纯线上模式：通过 HTTP 请求把内容写入线上编辑器（默认 https://md.foolgry.top），返回分享 URL，本地图片自动上传。支持纯文本直接发送和本地文件（含本地图片）发布；支持项目（Project）聚合多篇文章（日报、巡检报告等持续产出场景），对外只发一个项目链接。
+description: 公众号 Markdown 编辑器线上发布技能。当用户需要把 Markdown 文章发布为排版精美的微信公众号格式、生成可分享的在线链接时使用。纯线上模式：通过 HTTP 请求把内容写入线上编辑器（默认 https://md.foolgry.top），返回分享 URL，本地图片自动上传。发布需要令牌（WXMD_TOKEN），无令牌时到 <API 地址>/apply 申请。支持纯文本直接发送和本地文件（含本地图片）发布；支持项目（Project）聚合多篇文章（日报、巡检报告等持续产出场景），对外只发一个项目链接。
 ---
 
 # 公众号 Markdown 编辑器 - 线上发布
@@ -11,23 +11,25 @@ description: 公众号 Markdown 编辑器线上发布技能。当用户需要把
 
 核心脚本：`scripts/publish.py`（Python 3 标准库实现，**零依赖**，无需安装任何东西）。
 
+**发布需要令牌**：本站已关闭匿名发布，`publish`（含其中的图片上传）和所有项目操作都必须设置 `WXMD_TOKEN`。还没有令牌时访问 `<API 地址>/apply`（默认 <https://md.foolgry.top/apply>）申请，站长签发后会给你一串 `wmt_` 开头的令牌。未设置令牌时脚本会直接报错并给出申请入口，不会上传到一半才失败。
+
 **项目（Project）**是分享的命名集合：把持续产出的文章（日报、服务器巡检报告等）挂到同一个项目名下，对外只发一个聚合链接 `/p/<pid>`（打开默认显示最新一篇，左侧目录可翻历史），单篇深链为 `/p/<pid>/<sid>`。项目按**名字**引用，不存在时自动创建（无人值守的定时任务友好）；一篇分享最多属于一个项目，也可以不属于任何项目。
 
 ## 使用方式
 
-本技能的脚本路径为 `<skill目录>/scripts/publish.py`，以下统一用 `publish.py` 指代。
+本技能的脚本路径为 `<skill目录>/scripts/publish.py`，以下统一用 `publish.py` 指代，并在示例中用 `WXMD_TOKEN=xxx` 显式给出令牌（也可通过环境变量预先导出）。
 
 ### 1. 发布本地 Markdown 文件（最常用）
 
 ```bash
 # 默认使用 kami-slides 样式（无需传 --style）
-python3 publish.py publish --file article.md
+WXMD_TOKEN=xxx python3 publish.py publish --file article.md
 
 # 或指定其他样式
-python3 publish.py publish --file article.md --style latepost-depth
+WXMD_TOKEN=xxx python3 publish.py publish --file article.md --style latepost-depth
 ```
 
-- 文件中的**本地图片会自动上传到服务器**，引用自动改写为线上 URL，无需手动处理。
+- 文件中的**本地图片会自动上传到服务器**，引用自动改写为线上 URL，无需手动处理；图片上传与发布共用同一个令牌。
 - 图片相对路径按 Markdown 文件所在目录解析；已是 http(s):// 或 data: 的图片原样保留。
 - 输出 JSON：`{"id", "url", "style", "uploadedImages"}`（另有 `projectId` 等项目字段，见第 4 节），其中 `url` 即分享链接。
 
@@ -35,16 +37,16 @@ python3 publish.py publish --file article.md --style latepost-depth
 
 ```bash
 # 默认使用 kami-slides 样式
-python3 publish.py publish --text "# 标题\n正文内容"
+WXMD_TOKEN=xxx python3 publish.py publish --text "# 标题\n正文内容"
 
 # 或管道输入并指定样式
-cat article.md | python3 publish.py publish --style wechat-tech
+cat article.md | WXMD_TOKEN=xxx python3 publish.py publish --style wechat-tech
 ```
 
 ### 3. 发布后用浏览器打开
 
 ```bash
-python3 publish.py publish --file article.md --open
+WXMD_TOKEN=xxx python3 publish.py publish --file article.md --open
 ```
 
 ### 4. 发布到项目（--project）
@@ -55,7 +57,7 @@ WXMD_TOKEN=xxx python3 publish.py publish --file report.md --project 服务器�
 ```
 
 - `--project` 按**名字**引用项目，不存在时自动创建，适合 Agent 定时任务无人值守发布。
-- 需要 `WXMD_TOKEN`（未设置时回退 `WXMD_LIST_PASSWORD`，见环境变量）。
+- 同样需要 `WXMD_TOKEN`（未设置时回退 `WXMD_LIST_PASSWORD`，见环境变量）。
 - 输出 JSON 在原有字段上增加 `projectId` / `projectUrl` / `deepUrl`：
 
 ```json
@@ -152,22 +154,23 @@ WXMD_LIST_PASSWORD=xxx python3 publish.py delete <id>
 |---|---|---|
 | `WXMD_API_URL` | API 地址 | `https://md.foolgry.top` |
 | `WXMD_API_TIMEOUT` | 请求超时（秒） | `30` |
-| `WXMD_TOKEN` | 项目相关操作的令牌（发布带 `--project`、`projects`、`project-create`、`project-rename`、`attach`、`detach`） | 无 |
-| `WXMD_LIST_PASSWORD` | 列表/删除的管理密码；项目相关操作未设 `WXMD_TOKEN` 时回退用它（主密码视作站长凭证） | 无 |
+| `WXMD_TOKEN` | 发布令牌：`publish`（含图片上传）与全部项目操作都需要。从 `<API 地址>/apply` 申请 | 无 |
+| `WXMD_LIST_PASSWORD` | 列表/删除的管理密码；发布与项目操作未设 `WXMD_TOKEN` 时回退用它（主密码视作站长凭证） | 无 |
 
-凭证选择规则：项目相关操作优先 `WXMD_TOKEN`（`Authorization: Bearer`），未设置时回退 `WXMD_LIST_PASSWORD`（同样以 Bearer 发送）；`list` / `delete` 优先 `WXMD_TOKEN`，未设置时沿用 `X-List-Password` 头。两者都未设置时，项目相关操作报错提示设置 `WXMD_TOKEN`。
+凭证选择规则：优先 `WXMD_TOKEN`（`Authorization: Bearer`）；未设置时回退 `WXMD_LIST_PASSWORD`——发布与项目操作同样以 Bearer 发送（主密码视作站长凭证），`list` / `delete` 沿用 `X-List-Password` 头。两者都未设置时，`publish` 和项目操作都会报错并给出令牌申请入口，不会静默失败，也不会降级成匿名发布。
 
 ## 图片处理说明
 
 - 支持 png / jpg / jpeg / gif / webp / svg，单张 ≤10MB。
 - 本地图片通过 `POST /api/upload` 上传到服务器，文件存储在服务端 `data/uploads/`，经 `/uploads/<文件>` 访问。
+- **上传需要令牌**：与发布同口径，缺少有效令牌会返回 401，此时不会产生任何上传文件。
 - 同一张图片在同一篇文档中多次引用只上传一次。
 - 某张图上传失败不会中断发布：原引用保留，并在输出 JSON 的 `warnings` 中列出。
 
 ## 故障排查
 
 - **无法连接服务器**：检查网络和 `WXMD_API_URL`；`curl -s -o /dev/null -w '%{http_code}' https://md.foolgry.top` 应返回 200。
-- **HTTP 401**：list/delete 需要正确的 `WXMD_LIST_PASSWORD`；项目相关操作需要有效的 `WXMD_TOKEN`（或以 `WXMD_LIST_PASSWORD` 为主密码凭证），令牌可能已失效或被吊销。
+- **HTTP 401 / 需要令牌**：`publish`、图片上传和项目操作都需要有效令牌。若提示"凭证无效或已被吊销"，说明 `WXMD_TOKEN` 不对或已被站长吊销，重新申请即可；错误信息里会带上 `<API 地址>/apply` 申请入口。`list` / `delete` 需要正确的 `WXMD_LIST_PASSWORD` 或令牌。
 - **HTTP 400 不支持的图片格式**：图片扩展名需在支持列表内。
 - **HTTP 413**：图片超过 nginx 限制（20MB），先压缩图片再发布。
 - **发布后图片不显示**：查看输出 JSON 的 `warnings`，确认图片是否上传成功。
