@@ -1013,6 +1013,323 @@
       color: var(--color-primary);
     }
 
+    /* ==================== 项目化分享样式 ==================== */
+
+    /* 分享设置弹层（复用 share-modal 的遮罩/定位写法，独立类名） */
+    .project-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      animation: fadeIn 200ms ease-out;
+    }
+
+    .project-modal-content {
+      background: var(--color-surface);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: slideUp 300ms ease-out;
+    }
+
+    .project-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .project-modal-header h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--color-primary);
+      margin: 0;
+    }
+
+    .project-modal-close {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: var(--color-bg);
+      border-radius: 6px;
+      font-size: 20px;
+      color: var(--color-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .project-modal-close:hover:not(:disabled) {
+      background: var(--color-border);
+      color: var(--color-primary);
+    }
+
+    .project-modal-close:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .project-modal-body {
+      padding: 20px 24px;
+    }
+
+    .project-modal-desc {
+      font-size: 14px;
+      color: var(--color-secondary);
+      margin: 0 0 16px;
+    }
+
+    /* 归入项目折叠区 */
+    .project-collapse-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-bg);
+      color: var(--color-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .project-collapse-toggle:hover {
+      background: var(--color-border);
+      color: var(--color-primary);
+    }
+
+    .project-collapse-arrow {
+      display: inline-block;
+      transition: transform 0.2s;
+      font-size: 12px;
+    }
+
+    .project-collapse-arrow.expanded {
+      transform: rotate(90deg);
+    }
+
+    .project-collapse-value {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--color-accent);
+    }
+
+    .project-collapse-body {
+      padding: 14px 12px 4px;
+      border-left: 2px solid var(--color-border);
+      margin: 10px 0 0 4px;
+    }
+
+    .project-hint {
+      font-size: 12px;
+      color: var(--color-secondary);
+      margin: 0 0 10px;
+      line-height: 1.5;
+    }
+
+    .project-token-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .project-token-row input,
+    .project-field input,
+    .project-field select {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--color-primary);
+      background: var(--color-bg);
+      outline: none;
+    }
+
+    .project-token-row input:focus,
+    .project-field input:focus,
+    .project-field select:focus {
+      border-color: var(--color-accent);
+    }
+
+    .project-token-save-btn {
+      padding: 10px 16px;
+      background: var(--color-accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .project-token-save-btn:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .project-token-save-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .project-field {
+      margin-bottom: 12px;
+    }
+
+    .project-field-label {
+      display: block;
+      font-size: 12px;
+      color: var(--color-secondary);
+      margin-bottom: 6px;
+    }
+
+    .project-field select {
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .project-token-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0 6px;
+    }
+
+    .project-token-status-text {
+      font-size: 12px;
+      color: var(--color-secondary);
+    }
+
+    .project-token-action-btn {
+      padding: 4px 12px;
+      background: var(--color-bg);
+      color: var(--color-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .project-token-action-btn:hover {
+      background: var(--color-border);
+      color: var(--color-primary);
+    }
+
+    .project-error {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(211, 47, 47, 0.08);
+      color: #D32F2F;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .project-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 24px 20px;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .project-cancel-btn {
+      padding: 10px 20px;
+      background: var(--color-bg);
+      color: var(--color-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .project-cancel-btn:hover:not(:disabled) {
+      background: var(--color-border);
+      color: var(--color-primary);
+    }
+
+    .project-cancel-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .project-primary-btn {
+      padding: 10px 22px;
+      background: var(--color-accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .project-primary-btn:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .project-primary-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* 分享成功弹窗：项目链接 / 当前篇深链 */
+    .project-extra-links {
+      margin: -4px 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .project-url-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .project-url-label {
+      flex-shrink: 0;
+      width: 64px;
+      font-size: 12px;
+      color: var(--color-secondary);
+    }
+
+    .project-url-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 14px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--color-primary);
+      background: var(--color-bg);
+      outline: none;
+    }
+
+    .project-copy-btn {
+      padding: 10px 16px;
+    }
+
     @keyframes slideUp {
       from {
         transform: translateY(100px);
@@ -2128,7 +2445,7 @@
             <button
               class="wxmd-share-button"
               :class="{ sharing: sharing }"
-              @click="shareContent"
+              @click="openShareSettings"
               :disabled="sharing || !markdownInput"
               title="生成分享链接"
             >
@@ -2286,6 +2603,98 @@
       {{ toast.message }}
     </div>
 
+    <!-- 分享设置弹层 -->
+    <div v-if="showShareSettings" class="project-modal" @click.self="closeShareSettings">
+      <div class="project-modal-content">
+        <div class="project-modal-header">
+          <h3>分享</h3>
+          <button class="project-modal-close" @click="closeShareSettings" :disabled="sharing">×</button>
+        </div>
+        <div class="project-modal-body">
+          <p class="project-modal-desc">生成链接后即可发送；也可归入项目，持续更新同一聚合页。</p>
+
+          <!-- 归入项目折叠区（默认折叠） -->
+          <div class="project-section">
+            <button
+              type="button"
+              class="project-collapse-toggle"
+              @click="toggleProjectSection"
+            >
+              <span class="project-collapse-arrow" :class="{ expanded: projectSectionExpanded }">▸</span>
+              归入项目
+              <span v-if="newProjectName.trim() || selectedProject" class="project-collapse-value">
+                · {{ newProjectName.trim() || getProjectNameById(selectedProject) }}
+              </span>
+            </button>
+
+            <div v-if="projectSectionExpanded" class="project-collapse-body">
+              <!-- 未设令牌 -->
+              <template v-if="!shareToken">
+                <p class="project-hint">设置令牌后可归入项目（令牌由站长在管理页签发）</p>
+                <div class="project-token-row">
+                  <input
+                    type="text"
+                    v-model="shareTokenInput"
+                    placeholder="输入令牌"
+                    @keyup.enter="saveShareToken"
+                  >
+                  <button
+                    type="button"
+                    class="project-token-save-btn"
+                    @click="saveShareToken"
+                    :disabled="!shareTokenInput.trim() || projectsLoading"
+                  >保存令牌</button>
+                </div>
+              </template>
+
+              <!-- 已设令牌 -->
+              <template v-else>
+                <div class="project-field">
+                  <label class="project-field-label" for="project-select">项目</label>
+                  <select id="project-select" v-model="selectedProject" :disabled="projectsLoading">
+                    <option value="">不归入项目（独立单篇）</option>
+                    <option v-for="project in projects" :key="project.id" :value="project.id">
+                      {{ project.name }}（{{ project.shareCount }} 篇）
+                    </option>
+                  </select>
+                </div>
+                <div class="project-field">
+                  <label class="project-field-label" for="project-new-name">或输入新项目名</label>
+                  <input
+                    id="project-new-name"
+                    type="text"
+                    v-model="newProjectName"
+                    placeholder="填写后将创建新项目并优先使用"
+                  >
+                </div>
+                <div class="project-token-status">
+                  <span class="project-token-status-text">已设令牌</span>
+                  <button type="button" class="project-token-action-btn" @click="changeShareToken">更换</button>
+                  <button type="button" class="project-token-action-btn" @click="clearShareToken">清除</button>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div v-if="shareError" class="project-error">{{ shareError }}</div>
+        </div>
+        <div class="project-modal-footer">
+          <button
+            type="button"
+            class="project-cancel-btn"
+            @click="closeShareSettings"
+            :disabled="sharing"
+          >取消</button>
+          <button
+            type="button"
+            class="project-primary-btn"
+            @click="shareContent"
+            :disabled="sharing"
+          >{{ sharing ? '分享中...' : '生成分享链接' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 分享链接弹窗 -->
     <div v-if="shareUrl" class="share-modal" @click.self="shareUrl = null">
       <div class="share-modal-content">
@@ -2300,6 +2709,23 @@
             <button @click="copyShareUrl" class="share-copy-btn">
               {{ shareCopySuccess ? '✓ 已复制' : '复制链接' }}
             </button>
+          </div>
+          <!-- 项目链接与当前篇深链（仅归入项目时显示） -->
+          <div v-if="projectId" class="project-extra-links">
+            <div class="project-url-row">
+              <span class="project-url-label">项目链接</span>
+              <input type="text" :value="resolveShareUrl(projectUrl)" readonly>
+              <button @click="copyProjectLink" class="share-copy-btn project-copy-btn">
+                {{ projectLinkCopySuccess ? '✓ 已复制' : '复制' }}
+              </button>
+            </div>
+            <div class="project-url-row">
+              <span class="project-url-label">当前篇深链</span>
+              <input type="text" :value="resolveShareUrl(deepUrl)" readonly>
+              <button @click="copyDeepLink" class="share-copy-btn project-copy-btn">
+                {{ deepLinkCopySuccess ? '✓ 已复制' : '复制' }}
+              </button>
+            </div>
           </div>
           <div class="share-actions">
             <a :href="shareUrl" target="_blank" class="share-link-btn">打开链接</a>

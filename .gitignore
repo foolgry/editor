@@ -24,3 +24,7 @@ CLAUDE.md
 # 数据库
 server/data
 data
+
+# 编译产物（go build ./... 生成）
+server/huasheng-editor-server
+__pycache__/
