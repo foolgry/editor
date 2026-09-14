@@ -193,7 +193,18 @@ const editorApp = createApp({
       if (typeof this.bindEditorScrollSync === 'function') {
         this.bindEditorScrollSync();
       }
+      if (typeof this.ensureShareButtonVisible === 'function') {
+        this.ensureShareButtonVisible();
+        window.requestAnimationFrame(() => this.ensureShareButtonVisible());
+      }
     });
+
+    // 某些浏览器扩展会用全局规则隐藏分享按钮，页面加载后再补一次兜底。
+    this._shareButtonVisibilityTimeout = window.setTimeout(() => {
+      if (typeof this.ensureShareButtonVisible === 'function') {
+        this.ensureShareButtonVisible();
+      }
+    }, 300);
 
     // 监听键盘事件（ESC 关闭右键菜单）
     document.addEventListener('keydown', (e) => {
@@ -206,6 +217,10 @@ const editorApp = createApp({
   beforeUnmount() {
     if (typeof this.unbindEditorScrollSync === 'function') {
       this.unbindEditorScrollSync();
+    }
+    if (this._shareButtonVisibilityTimeout) {
+      window.clearTimeout(this._shareButtonVisibilityTimeout);
+      this._shareButtonVisibilityTimeout = null;
     }
   },
 
@@ -275,6 +290,29 @@ const editorApp = createApp({
     showToast(message, type = 'success') {
       const logger = type === 'error' ? console.error : console.log;
       logger(message);
+    },
+
+    ensureShareButtonVisible() {
+      const shareButton = this.$refs.shareButton;
+      if (!shareButton || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+        return;
+      }
+
+      const computedStyle = window.getComputedStyle(shareButton);
+      const rect = typeof shareButton.getBoundingClientRect === 'function'
+        ? shareButton.getBoundingClientRect()
+        : { width: shareButton.offsetWidth, height: shareButton.offsetHeight };
+      const hiddenByCosmeticFilter = computedStyle.display === 'none'
+        || computedStyle.visibility === 'hidden'
+        || (rect.width === 0 && rect.height === 0);
+
+      if (!hiddenByCosmeticFilter) {
+        return;
+      }
+
+      shareButton.style.setProperty('display', 'flex', 'important');
+      shareButton.style.setProperty('visibility', 'visible', 'important');
+      shareButton.style.setProperty('opacity', '1', 'important');
     },
 
     /**
