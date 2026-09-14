@@ -28,6 +28,8 @@ func generateListPageHTML() string {
       --danger-text: #b91c1c;
     }
     * { box-sizing: border-box; }
+    /* hidden 属性必须始终生效：.overlay/.identity 等自设 display 会压过 UA 默认规则 */
+    [hidden] { display: none !important; }
     body {
       margin: 0;
       padding: 24px;
