@@ -24,3 +24,7 @@ CLAUDE.md
 # 数据库
 server/data
 data
+
+# 本地构建产物
+server/huasheng-editor-server
+__pycache__/

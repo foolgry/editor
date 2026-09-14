@@ -6,11 +6,11 @@ default:
 
 # 启动本地服务
 start:
-    cd server && go run main.go
+    cd server && go run .
 
 # 启动开发服务器（别名）
 dev:
-    cd server && go run main.go
+    cd server && go run .
 
 # 整理后端 Go 依赖
 tidy:

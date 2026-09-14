@@ -2223,10 +2223,175 @@ const markdown = \`![图片](img://\${imageId})\`;
 
     // ==================== 分享功能 ====================
 
-    // 分享内容
+    // 打开分享设置弹层（点"分享"按钮先进入设置，再生成链接）
+    openShareSettings() {
+      if (!this.markdownInput || !this.markdownInput.trim()) {
+        this.showToast('内容为空，无法分享', 'error');
+        return;
+      }
+
+      this.shareError = null;
+      this.shareTokenInput = '';
+      this.projectSectionExpanded = false; // "归入项目"默认折叠
+      this.showShareSettings = true;
+    },
+
+    // 关闭分享设置弹层
+    closeShareSettings() {
+      this.showShareSettings = false;
+    },
+
+    // 展开/收起"归入项目"折叠区
+    toggleProjectSection() {
+      this.projectSectionExpanded = !this.projectSectionExpanded;
+
+      // 展开时若已设令牌但项目列表为空且未在加载中，静默补拉一次
+      if (
+        this.projectSectionExpanded &&
+        this.shareToken &&
+        !this.projects.length &&
+        !this.projectsLoading
+      ) {
+        this.loadProjects({ silent: true });
+      }
+    },
+
+    // 页面加载时从 localStorage 恢复令牌，并异步拉取项目列表（失败静默）
+    async restoreShareToken() {
+      let token = '';
+      try {
+        token = localStorage.getItem('wx-editor-token') || '';
+      } catch (error) {
+        console.error('读取分享令牌失败:', error);
+        return;
+      }
+
+      if (!token) return;
+
+      this.shareToken = token;
+      await this.loadProjects({ silent: true });
+    },
+
+    // 保存令牌到 localStorage，并立即拉取项目列表
+    async saveShareToken() {
+      const token = (this.shareTokenInput || '').trim();
+      if (!token) {
+        this.showToast('请输入令牌', 'error');
+        return;
+      }
+
+      try {
+        localStorage.setItem('wx-editor-token', token);
+      } catch (error) {
+        console.error('保存令牌失败:', error);
+        this.showToast('保存令牌失败', 'error');
+        return;
+      }
+
+      this.shareToken = token;
+      this.shareTokenInput = '';
+      this.showToast('令牌已保存', 'success');
+
+      await this.loadProjects();
+    },
+
+    // 更换令牌：清除本地令牌，回到输入界面
+    changeShareToken() {
+      this.removeShareTokenFromStorage();
+      this.shareToken = '';
+      this.shareTokenInput = '';
+      this.projects = [];
+      this.selectedProject = '';
+      this.newProjectName = '';
+      this.projectSectionExpanded = true;
+    },
+
+    // 清除令牌（回到匿名分享）
+    clearShareToken() {
+      this.removeShareTokenFromStorage();
+      this.shareToken = '';
+      this.shareTokenInput = '';
+      this.projects = [];
+      this.selectedProject = '';
+      this.newProjectName = '';
+    },
+
+    removeShareTokenFromStorage() {
+      try {
+        localStorage.removeItem('wx-editor-token');
+      } catch (error) {
+        console.error('清除令牌失败:', error);
+      }
+    },
+
+    // 拉取自己名下的项目列表（GET /api/projects，需令牌）
+    async loadProjects(options = {}) {
+      const silent = !!options.silent;
+
+      if (!this.shareToken) {
+        this.projects = [];
+        return;
+      }
+
+      this.projectsLoading = true;
+
+      try {
+        const response = await fetch(`${this.shareServerUrl}/api/projects`, {
+          headers: {
+            'Authorization': `Bearer ${this.shareToken}`
+          }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          this.projects = [];
+          if (!silent) {
+            this.showToast('令牌无效或已吊销，请更换令牌', 'error');
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`加载项目列表失败 (${response.status})`);
+        }
+
+        const data = await response.json();
+        this.projects = data && Array.isArray(data.items) ? data.items : [];
+      } catch (error) {
+        console.error('加载项目列表失败:', error);
+        this.projects = [];
+        if (!silent) {
+          this.showToast('加载项目列表失败', 'error');
+        }
+      } finally {
+        this.projectsLoading = false;
+      }
+    },
+
+    // 按项目 ID 取项目名（下拉选中项展示用），找不到时回退返回 ID 本身
+    getProjectNameById(projectId) {
+      if (!projectId) return '';
+      const project = (this.projects || []).find(p => p.id === projectId);
+      return project ? project.name : projectId;
+    },
+
+    // 分享内容（由分享设置弹层的"生成分享链接"触发）
     async shareContent() {
       if (!this.markdownInput || !this.markdownInput.trim()) {
         this.showToast('内容为空，无法分享', 'error');
+        return;
+      }
+
+      const newProjectName = (this.newProjectName || '').trim();
+      // 新项目名有值时优先于下拉选择；均为空则发布独立单篇（匿名，与现状一致）
+      const selectedProjectId = !newProjectName ? (this.selectedProject || '') : '';
+      // 展示/判断用的项目名（新名或下拉选中项目的名字）
+      const projectName = newProjectName || this.getProjectNameById(selectedProjectId);
+
+      // 选择了项目但未设令牌（正常 UI 不会出现，防御处理）
+      if (projectName && !this.shareToken) {
+        this.shareError = '归入项目需要先设置令牌';
+        this.projectSectionExpanded = true;
+        this.showToast('归入项目需要先设置令牌', 'error');
         return;
       }
 
@@ -2235,25 +2400,59 @@ const markdown = \`![图片](img://\${imageId})\`;
 
       try {
         const shareContent = await this.prepareShareContent();
+        const requestBody = {
+          content: shareContent,
+          style: this.currentStyle
+        };
+        const requestHeaders = {
+          'Content-Type': 'application/json'
+        };
+
+        // 仅在归入项目时携带项目字段与令牌；匿名路径不带 Authorization。
+        // 下拉已有项目按 id 精确挂载（跨创建者同名时不会挂错），新名走服务端自动创建
+        if (projectName) {
+          if (selectedProjectId) {
+            requestBody.projectId = selectedProjectId;
+          } else {
+            requestBody.project = projectName;
+          }
+          requestHeaders['Authorization'] = `Bearer ${this.shareToken}`;
+        }
+
         const response = await fetch(`${this.shareServerUrl}/api/share`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            content: shareContent,
-            style: this.currentStyle
-          })
+          headers: requestHeaders,
+          body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
 
         if (!response.ok) {
+          // 令牌无效：提示并自动展开折叠区，便于更换令牌
+          if ((response.status === 401 || response.status === 403) && projectName) {
+            this.shareError = '令牌无效或已吊销，请更换令牌';
+            this.projectSectionExpanded = true;
+            this.showToast('令牌无效或已吊销，请更换令牌', 'error');
+            return;
+          }
           throw new Error(data.error || '分享失败');
         }
 
         this.shareUrl = `${this.shareServerUrl}/s/${data.id}`;
+        this.projectId = data.projectId || null;
+        this.projectUrl = data.projectUrl || null;
+        this.deepUrl = data.deepUrl || null;
+        this.projectLinkCopySuccess = false;
+        this.deepLinkCopySuccess = false;
+        this.showShareSettings = false; // 关闭设置弹层，展示分享成功弹窗
         this.showToast('分享成功！链接已生成', 'success');
+
+        // 重置项目选择并静默刷新下拉（新建的项目下次打开发布即可选中）
+        if (this.shareToken) {
+          this.selectedProject = '';
+          this.newProjectName = '';
+          this.loadProjects({ silent: true });
+        }
 
         // 复制到剪贴板
         await this.copyShareUrl();
@@ -2305,34 +2504,68 @@ const markdown = \`![图片](img://\${imageId})\`;
       });
     },
 
-    // 复制分享链接
-    async copyShareUrl() {
-      if (!this.shareUrl) return;
+    // 将后端返回的相对路径（如 /p/abc/xyz）拼为完整展示链接；已是完整 URL 则原样返回
+    resolveShareUrl(path) {
+      if (!path) return null;
+      if (/^https?:\/\//i.test(path)) return path;
+      return `${this.shareServerUrl}${path}`;
+    },
 
+    // 通用复制：优先剪贴板 API，失败时降级 execCommand
+    async copyTextToClipboard(text) {
       try {
-        await navigator.clipboard.writeText(this.shareUrl);
-        this.shareCopySuccess = true;
-        this.showToast('链接已复制到剪贴板', 'success');
-
-        setTimeout(() => {
-          this.shareCopySuccess = false;
-        }, 2000);
+        await navigator.clipboard.writeText(text);
       } catch (err) {
         console.error('复制链接失败:', err);
         // 降级方案
         const textarea = document.createElement('textarea');
-        textarea.value = this.shareUrl;
+        textarea.value = text;
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
-        this.shareCopySuccess = true;
-        this.showToast('链接已复制到剪贴板', 'success');
-
-        setTimeout(() => {
-          this.shareCopySuccess = false;
-        }, 2000);
       }
+    },
+
+    // 复制分享链接
+    async copyShareUrl() {
+      if (!this.shareUrl) return;
+
+      await this.copyTextToClipboard(this.shareUrl);
+      this.shareCopySuccess = true;
+      this.showToast('链接已复制到剪贴板', 'success');
+
+      setTimeout(() => {
+        this.shareCopySuccess = false;
+      }, 2000);
+    },
+
+    // 复制项目链接
+    async copyProjectLink() {
+      const url = this.resolveShareUrl(this.projectUrl);
+      if (!url) return;
+
+      await this.copyTextToClipboard(url);
+      this.projectLinkCopySuccess = true;
+      this.showToast('链接已复制到剪贴板', 'success');
+
+      setTimeout(() => {
+        this.projectLinkCopySuccess = false;
+      }, 2000);
+    },
+
+    // 复制当前篇深链
+    async copyDeepLink() {
+      const url = this.resolveShareUrl(this.deepUrl);
+      if (!url) return;
+
+      await this.copyTextToClipboard(url);
+      this.deepLinkCopySuccess = true;
+      this.showToast('链接已复制到剪贴板', 'success');
+
+      setTimeout(() => {
+        this.deepLinkCopySuccess = false;
+      }, 2000);
     },
 
     // ==================== 主题管理功能 ====================

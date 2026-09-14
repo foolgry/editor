@@ -79,6 +79,22 @@ const editorApp = createApp({
       shareError: null,             // 分享错误信息
       shareCopySuccess: false,      // 分享链接复制成功状态
       shareServerUrl: window.location.origin, // 分享服务器地址
+
+      // 项目化分享
+      showShareSettings: false,     // 分享设置弹层显示状态
+      projectSectionExpanded: false, // "归入项目"折叠区展开状态（默认折叠）
+      shareToken: '',               // 已保存的分享令牌（localStorage: wx-editor-token）
+      shareTokenInput: '',          // 令牌输入框内容
+      projects: [],                 // 自己名下的项目列表
+      projectsLoading: false,       // 项目列表加载中
+      selectedProject: '',          // 下拉选中项目的 ID（'' = 不归入项目）
+      newProjectName: '',           // 新项目名（有值时优先于下拉）
+      projectId: null,              // 分享成功后归属的项目 ID（未挂项目为 null）
+      projectUrl: null,             // 分享成功后返回的项目链接（后端相对路径）
+      deepUrl: null,                // 分享成功后返回的当前篇深链（后端相对路径）
+      projectLinkCopySuccess: false, // 项目链接复制成功状态
+      deepLinkCopySuccess: false,   // 深链复制成功状态
+
       mermaidInitialized: false,    // Mermaid 是否已初始化
 
       // 主题管理
@@ -121,6 +137,11 @@ const editorApp = createApp({
     // 加载主题顺序配置
     if (typeof this.loadStyleOrder === 'function') {
       this.loadStyleOrder();
+    }
+
+    // 恢复分享令牌（若已设置则异步拉取项目列表，失败静默）
+    if (typeof this.restoreShareToken === 'function') {
+      this.restoreShareToken();
     }
 
     // 初始化图片存储管理器
