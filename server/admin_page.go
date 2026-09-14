@@ -649,7 +649,8 @@ func generateListPageHTML() string {
           "<h3 class='modal-title'>挂载 / 移动到项目</h3>" +
           "<div class='muted' style='margin-bottom:12px;'>分享：" + escapeHTML(shareTitle) + "</div>" +
           "<select id='attachSelect'>" + options.join("") + "</select>" +
-          "<input id='attachNewName' type='text' placeholder='新项目名称' style='margin-top:10px; display:none;' />" +
+          "<input id='attachNewName' class='input' type='text' placeholder='新项目名称' " +
+          "style='margin-top:10px; display:none;' />" +
           "<div id='attachError' class='error' style='margin-top:8px;'></div>" +
           "<div class='modal-actions'>" +
           "<button id='attachConfirm' type='button'>确定</button>" +
@@ -659,10 +660,19 @@ func generateListPageHTML() string {
 
         var selectEl = document.getElementById("attachSelect");
         var newNameEl = document.getElementById("attachNewName");
-        selectEl.addEventListener("change", function () {
-          newNameEl.style.display = selectEl.value === "__new__" ? "" : "none";
-          if (selectEl.value === "__new__") newNameEl.focus();
-        });
+        var attachErrorEl = document.getElementById("attachError");
+
+        // 下拉默认项就是「新建项目」时 change 不触发（分享尚未归属项目，
+        // 或用户重新选中同一个选项），所以初始状态必须显式同步一次，
+        // 否则界面停留在没有输入框的状态，确认只会报「请输入新项目名称」
+        function syncNewNameField(userChanged) {
+          var isNew = selectEl.value === "__new__";
+          newNameEl.style.display = isNew ? "" : "none";
+          attachErrorEl.textContent = "";
+          if (isNew && userChanged) newNameEl.focus();
+        }
+        selectEl.addEventListener("change", function () { syncNewNameField(true); });
+        syncNewNameField(false);
 
         document.getElementById("attachCancel").addEventListener("click", closeModal);
         document.getElementById("attachConfirm").addEventListener("click", async function () {
@@ -672,7 +682,8 @@ func generateListPageHTML() string {
           if (selectEl.value === "__new__") {
             var projectName = newNameEl.value.trim();
             if (!projectName) {
-              document.getElementById("attachError").textContent = "请输入新项目名称";
+              attachErrorEl.textContent = "请输入新项目名称";
+              newNameEl.focus();
               return;
             }
             payload = { project: projectName };
@@ -692,7 +703,7 @@ func generateListPageHTML() string {
           } catch (error) {
             confirmBtn.disabled = false;
             if (credential) {
-              document.getElementById("attachError").textContent = error.message;
+              attachErrorEl.textContent = error.message;
             }
           }
         });
