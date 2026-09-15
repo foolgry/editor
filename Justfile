@@ -21,3 +21,4 @@ lint:
     node -c frontend/styles.js
     node -c frontend/app.js
     node -c frontend/render-core.js
+    node -c frontend/outline.js

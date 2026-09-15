@@ -53,7 +53,7 @@ const projectArticleTemplate = `<div v-if="loading" class="loading">
         <h3>{{ error }}</h3>
       </div>
 
-      <div v-else v-html="renderedContent"></div>`
+      <div v-else class="wxmd-article" v-html="renderedContent"></div>`
 
 // projectPageTemplate 项目聚合页模板：左侧目录 + 右侧文章区 + 移动端抽屉。
 // 资源加载与单篇分享页（generateSharePageHTML）完全一致。
@@ -392,6 +392,7 @@ const projectPageTemplate = `<!DOCTYPE html>
   <script src="/lib/lazy-loader.js" defer></script>
   <script src="/render-core.js" defer></script>
   <script src="/styles.js" defer></script>
+  <script src="/outline.js" defer></script>
   <script>
     // 库脚本均带 defer，会在 DOMContentLoaded 之前按文档顺序执行完毕，
     // 因此在 DOMContentLoaded 回调里启动时 Vue / markdown-it / hljs / STYLES 已就绪
@@ -722,6 +723,9 @@ const projectPageTemplate = `<!DOCTYPE html>
         switchShare(sid, false);
       }
     });
+
+    // 右侧大纲（从渲染后的文章里取 h2/h3/h4，默认展开、可收起）；切换文章后自动重建
+    if (window.WXMDOutline) window.WXMDOutline.mount();
     });
   </script>
 </body>
