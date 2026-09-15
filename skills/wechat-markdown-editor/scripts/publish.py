@@ -11,12 +11,19 @@
   project-rename 重命名项目（需要 WXMD_TOKEN）
   attach         把分享挂载到项目（需要 WXMD_TOKEN）
   detach         把分享移出项目（需要 WXMD_TOKEN）
+  set-token      把令牌写入技能目录下的 .env（需要 WXMD_TOKEN 的操作一次配置即可）
+  token-status   显示当前生效的凭证来源与掩码，排查"令牌没生效"
 
 本站已关闭匿名发布：publish 及其图片上传都必须带令牌，未设置 WXMD_TOKEN 会直接
 报错（主密码 WXMD_LIST_PASSWORD 可作为站长凭证回退）。还没有令牌时到
 <API 地址>/apply 申请。
 
-环境变量：
+凭证与配置来自两处，环境变量优先，其次技能目录下的 .env（默认无需任何环境变量）：
+
+  <技能目录>/.env     形如 WXMD_TOKEN=wmt_xxxx，可手动编辑，也可用
+                      `publish.py set-token` 写入（会同时把文件权限设为 600）
+
+可配置项：
   WXMD_API_URL        API 地址，默认 https://md.foolgry.top
   WXMD_API_TIMEOUT    请求超时秒数，默认 30
   WXMD_TOKEN          发布/项目相关操作的令牌，优先于 WXMD_LIST_PASSWORD
@@ -90,12 +97,156 @@ class PublishError(Exception):
     pass
 
 
+# 技能目录 = scripts/ 的上一级；.env 与 SKILL.md 同级，便于用户直接找到并编辑
+SKILL_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE = SKILL_ROOT / ".env"
+SCRIPT_PATH = Path(__file__).resolve()
+
+ENV_TEMPLATE = """# wxmd-publish 凭证与配置
+# 本文件已被 .gitignore 忽略，令牌不会进仓库；也可用 `publish.py set-token` 写入。
+# 检查当前生效的凭证：python3 scripts/publish.py token-status
+
+# 发布令牌（wmt_ 开头）。publish（含图片上传）与全部项目操作都需要
+# 申请入口见 SKILL.md，或访问 <API 地址>/apply
+"""
+
+
+def _unquote_env_value(raw):
+    """解析 .env 的值：去包裹引号并识别行尾注释。
+
+    单引号内原样保留；双引号内按 shell 习惯解析 \\n \\t \\" \\\\；引号之外
+    的 ` #` 起视为行尾注释（令牌不含空格，这个粒度够用）。
+    """
+    raw = raw.strip()
+    if not raw:
+        return ""
+    if raw[0] in ("'", '"'):
+        quote = raw[0]
+        out = []
+        i = 1
+        while i < len(raw):
+            ch = raw[i]
+            if ch == "\\" and quote == '"' and i + 1 < len(raw):
+                nxt = raw[i + 1]
+                out.append({"n": "\n", "t": "\t", '"': '"', "\\": "\\"}.get(nxt, "\\" + nxt))
+                i += 2
+                continue
+            if ch == quote:
+                break  # 引号闭合，后面的内容（通常是注释）忽略
+            out.append(ch)
+            i += 1
+        return "".join(out)
+    for i, ch in enumerate(raw):
+        if ch == "#" and i > 0 and raw[i - 1].isspace():
+            return raw[:i].rstrip()
+    return raw
+
+
+def parse_env_file(path):
+    """解析 .env：逐行 KEY=VALUE，支持 export 前缀、引号与 # 注释。
+
+    文件缺失或不可读时返回空字典——.env 是可选便利，不该让脚本直接失败。
+    """
+    result = {}
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return result
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        key, sep, value = line.partition("=")
+        key = key.strip()
+        if not sep or not key:
+            continue
+        result[key] = _unquote_env_value(value.strip())
+    return result
+
+
+_ENV_CACHE = None
+
+
+def _load_env():
+    global _ENV_CACHE
+    if _ENV_CACHE is None:
+        _ENV_CACHE = parse_env_file(ENV_FILE)
+    return _ENV_CACHE
+
+
+def env_value(name):
+    """取配置：真实环境变量优先，其次技能目录下的 .env；空值视作未设置。"""
+    from_env = (os.environ.get(name) or "").strip()
+    if from_env:
+        return from_env
+    return (_load_env().get(name) or "").strip()
+
+
+def env_source(name):
+    """说明当前生效值来自哪里：'环境变量' / '.env' / ''（未设置）。
+
+    排查"令牌明明写进 .env 了却没生效"时，靠它区分是不是被环境变量顶掉了。
+    """
+    if (os.environ.get(name) or "").strip():
+        return "环境变量"
+    if (_load_env().get(name) or "").strip():
+        return ".env"
+    return ""
+
+
+def mask_secret(value):
+    """只露头尾，够辨认是哪个令牌，又不足以被拿去用。"""
+    if len(value) <= 12:
+        return f"****（共 {len(value)} 字符）"
+    return f"{value[:8]}…{value[-4:]}（共 {len(value)} 字符）"
+
+
+def ensure_env_file():
+    """.env 不存在时用模板创建，让用户/agent 有个现成文件可改。"""
+    if not ENV_FILE.is_file():
+        ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+        ENV_FILE.write_text(ENV_TEMPLATE, encoding="utf-8")
+    try:
+        ENV_FILE.chmod(0o600)
+    except OSError:
+        pass
+    return ENV_FILE
+
+
+def write_env_value(key, value):
+    """把 KEY=VALUE 写进 .env：已有该键则原地替换，否则追加，其余内容保持不变。"""
+    ensure_env_file()
+    lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
+    for i, old in enumerate(lines):
+        stripped = old.strip()
+        body = stripped[len("export "):].lstrip() if stripped.startswith("export ") else stripped
+        if body.partition("=")[0].strip() == key:
+            lines[i] = f"{key}={value}"
+            break
+    else:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.append(f"{key}={value}")
+    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    ENV_FILE.chmod(0o600)
+    global _ENV_CACHE
+    _ENV_CACHE = None
+    return ENV_FILE
+
+
+def script_hint():
+    """报错时给出的可复制命令，用绝对路径，避免用户猜脚本在哪。"""
+    return f"python3 {SCRIPT_PATH}"
+
+
 def base_url(args):
-    return (args.base_url or os.environ.get("WXMD_API_URL") or DEFAULT_BASE_URL).rstrip("/")
+    return (args.base_url or env_value("WXMD_API_URL") or DEFAULT_BASE_URL).rstrip("/")
 
 
 def timeout():
-    raw = os.environ.get("WXMD_API_TIMEOUT", "")
+    raw = env_value("WXMD_API_TIMEOUT")
     try:
         return max(1, int(raw))
     except ValueError:
@@ -321,20 +472,25 @@ def auth_headers(require_token=False, base=None):
     require_token=False：list/delete，WXMD_TOKEN 以 Bearer 发送；
     WXMD_LIST_PASSWORD 沿用 X-List-Password 头（维持现状）。
 
-    base 有值时，缺少凭证的报错会附上令牌申请入口。
+    取值顺序为「环境变量 > .env」（见 env_value）。base 有值时，缺少凭证的报错
+    会附上令牌申请入口。
     """
-    apply_hint = f"（申请令牌：{base}/apply）" if base else ""
-    token = os.environ.get("WXMD_TOKEN", "").strip()
+    apply_hint = f"；申请令牌：{base}/apply" if base else ""
+    token = env_value("WXMD_TOKEN")
     if token:
         return {"Authorization": f"Bearer {token}"}
-    password = os.environ.get("WXMD_LIST_PASSWORD", "").strip()
+    password = env_value("WXMD_LIST_PASSWORD")
     if password:
         if require_token:
             return {"Authorization": f"Bearer {password}"}
         return {"X-List-Password": password}
     if require_token:
-        raise PublishError(f"需要令牌：请设置环境变量 WXMD_TOKEN{apply_hint}")
-    raise PublishError(f"需要管理密码：请设置环境变量 WXMD_LIST_PASSWORD{apply_hint}")
+        raise PublishError(
+            f"需要令牌：请在 {ENV_FILE} 里设置 WXMD_TOKEN=wmt_xxxx，"
+            f"或执行 {script_hint()} set-token wmt_xxxx{apply_hint}")
+    raise PublishError(
+        f"需要管理密码：请在 {ENV_FILE} 里设置 WXMD_LIST_PASSWORD=xxxx，"
+        f"或设置同名环境变量{apply_hint}")
 
 
 def cmd_get(args):
@@ -426,6 +582,63 @@ def cmd_detach(args):
     print_share(result, base)
 
 
+def cmd_set_token(args):
+    """把令牌写进技能目录下的 .env，用户和 agent 都不用去找文件、也不用手改格式。
+
+    令牌优先取位置参数；未给时从 stdin 读（管道传入不会留在 shell 历史里）。
+    """
+    if args.token is not None:
+        raw = args.token
+    elif not sys.stdin.isatty():
+        raw = sys.stdin.read()
+    else:
+        raw = ""
+    token = raw.strip()
+    if not token:
+        raise PublishError(
+            "缺少令牌："
+            f"{script_hint()} set-token wmt_xxxx，"
+            "或 echo 'wmt_xxxx' | "
+            f"{script_hint()} set-token"
+        )
+    write_env_value("WXMD_TOKEN", token)
+    result = {
+        "ok": True,
+        "envFile": str(ENV_FILE),
+        "token": mask_secret(token),
+        "hint": "已写入，之后发布无需再传令牌；可用 token-status 确认",
+    }
+    if not token.startswith("wmt_"):
+        result["warning"] = "令牌通常以 wmt_ 开头，请确认没有写错或漏掉字符"
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def cmd_token_status(args):
+    """报告当前生效的凭证来源，用于确认 .env 有没有被读到。"""
+    base = base_url(args)
+    token = env_value("WXMD_TOKEN")
+    password = env_value("WXMD_LIST_PASSWORD")
+    print(json.dumps({
+        "envFile": str(ENV_FILE),
+        "envFileExists": ENV_FILE.is_file(),
+        "apiUrl": base,
+        "applyUrl": f"{base}/apply",
+        "publishToken": {
+            "configured": bool(token),
+            "source": env_source("WXMD_TOKEN") or None,
+            "value": mask_secret(token) if token else None,
+        },
+        "listPassword": {
+            "configured": bool(password),
+            "source": env_source("WXMD_LIST_PASSWORD") or None,
+        },
+        "ready": bool(token or password),
+        "hint": "source 为 '环境变量' 时说明环境变量覆盖了 .env" if token else
+                f"未配置令牌：在 {ENV_FILE} 里写 WXMD_TOKEN=wmt_xxxx，"
+                f"或执行 {script_hint()} set-token wmt_xxxx",
+    }, ensure_ascii=False, indent=2))
+
+
 def cmd_styles(args):
     print(json.dumps([{"key": k, "name": v} for k, v in STYLES.items()],
                      ensure_ascii=False, indent=2))
@@ -486,6 +699,13 @@ def main():
 
     p_styles = sub.add_parser("styles", help="列出可用排版样式")
     p_styles.set_defaults(func=cmd_styles)
+
+    p_set = sub.add_parser("set-token", help="把令牌写入技能目录下的 .env")
+    p_set.add_argument("token", nargs="?", help="令牌；省略则从 stdin 读取")
+    p_set.set_defaults(func=cmd_set_token)
+
+    p_status = sub.add_parser("token-status", help="显示当前生效的凭证来源（掩码）")
+    p_status.set_defaults(func=cmd_token_status)
 
     args = parser.parse_args()
     if not getattr(args, "func", None):
