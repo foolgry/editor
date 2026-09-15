@@ -11,29 +11,30 @@
   project-rename 重命名项目（需要 WXMD_TOKEN）
   attach         把分享挂载到项目（需要 WXMD_TOKEN）
   detach         把分享移出项目（需要 WXMD_TOKEN）
-  set-token      把令牌写入技能目录下的 .env（需要 WXMD_TOKEN 的操作一次配置即可）
-  token-status   显示当前生效的凭证来源与掩码，排查"令牌没生效"
+  set-token      把令牌写入技能目录下的 .env（缺少令牌时用一次）
+  token-status   显示 .env 里读到的凭证与掩码，报错后排查用
 
-本站已关闭匿名发布：publish 及其图片上传都必须带令牌，未设置 WXMD_TOKEN 会直接
-报错（主密码 WXMD_LIST_PASSWORD 可作为站长凭证回退）。还没有令牌时到
+本站已关闭匿名发布：publish 及其图片上传都必须带令牌，缺少令牌会直接报错
+（主密码 WXMD_LIST_PASSWORD 可作为站长凭证回退）。还没有令牌时到
 <API 地址>/apply 申请。
 
-凭证与配置来自两处，环境变量优先，其次技能目录下的 .env（默认无需任何环境变量）：
+配置只来自技能目录下的 .env 这一个文件，脚本不读任何环境变量：
 
-  <技能目录>/.env     形如 WXMD_TOKEN=wmt_xxxx，可手动编辑，也可用
-                      `publish.py set-token` 写入（会同时把文件权限设为 600）
+  <技能目录>/.env
 
-可配置项：
+可用键（写法为 KEY=VALUE，可带引号和 # 注释）：
   WXMD_API_URL        API 地址，默认 https://md.foolgry.top
   WXMD_API_TIMEOUT    请求超时秒数，默认 30
   WXMD_TOKEN          发布/项目相关操作的令牌，优先于 WXMD_LIST_PASSWORD
   WXMD_LIST_PASSWORD  列表/删除的管理密码；发布与项目相关操作未设 WXMD_TOKEN 时
                       回退用它（主密码视作站长凭证）
+
+正常流程是直接调 publish，不需要事先检查 .env：配好了就成功，没配好报错信息
+里会给出 .env 路径和 set-token 命令。手动编辑 .env 或 `set-token` 均可写入。
 """
 
 import argparse
 import json
-import os
 import re
 import sys
 import urllib.error
@@ -97,14 +98,18 @@ class PublishError(Exception):
     pass
 
 
-# 技能目录 = scripts/ 的上一级；.env 与 SKILL.md 同级，便于用户直接找到并编辑
+# 技能目录 = scripts/ 的上一级；.env 与 SKILL.md 同级，便于用户直接找到并编辑。
+#
+# 注意（维护者）：向 ~/.agents/skills 等位置同步本技能时，务必排除 .env。
+# 项目里的是模板，用户/agent 在每个落地位置各自填令牌，覆盖会把令牌冲掉。
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = SKILL_ROOT / ".env"
 SCRIPT_PATH = Path(__file__).resolve()
 
-ENV_TEMPLATE = """# wxmd-publish 凭证与配置
-# 本文件已被 .gitignore 忽略，令牌不会进仓库；也可用 `publish.py set-token` 写入。
-# 检查当前生效的凭证：python3 scripts/publish.py token-status
+ENV_TEMPLATE = """# wxmd-publish 凭证与配置（本文件是唯一配置来源，脚本不读环境变量）
+# 已被 .gitignore 忽略，令牌不会进仓库；也可用 `publish.py set-token` 写入。
+# 同步本技能到全局位置时不要覆盖本文件，否则已配好的令牌会丢。
+# 发布报错后再来看这里：python3 scripts/publish.py token-status
 
 # 发布令牌（wmt_ 开头）。publish（含图片上传）与全部项目操作都需要
 # 申请入口见 SKILL.md，或访问 <API 地址>/apply
@@ -177,23 +182,8 @@ def _load_env():
 
 
 def env_value(name):
-    """取配置：真实环境变量优先，其次技能目录下的 .env；空值视作未设置。"""
-    from_env = (os.environ.get(name) or "").strip()
-    if from_env:
-        return from_env
+    """取配置项，唯一来源是技能目录下的 .env；键不存在或值为空都返回空串。"""
     return (_load_env().get(name) or "").strip()
-
-
-def env_source(name):
-    """说明当前生效值来自哪里：'环境变量' / '.env' / ''（未设置）。
-
-    排查"令牌明明写进 .env 了却没生效"时，靠它区分是不是被环境变量顶掉了。
-    """
-    if (os.environ.get(name) or "").strip():
-        return "环境变量"
-    if (_load_env().get(name) or "").strip():
-        return ".env"
-    return ""
 
 
 def mask_secret(value):
@@ -472,8 +462,8 @@ def auth_headers(require_token=False, base=None):
     require_token=False：list/delete，WXMD_TOKEN 以 Bearer 发送；
     WXMD_LIST_PASSWORD 沿用 X-List-Password 头（维持现状）。
 
-    取值顺序为「环境变量 > .env」（见 env_value）。base 有值时，缺少凭证的报错
-    会附上令牌申请入口。
+    凭证读自技能目录下的 .env（见 env_value）。base 有值时，缺少凭证的报错会附上
+    令牌申请入口。
     """
     apply_hint = f"；申请令牌：{base}/apply" if base else ""
     token = env_value("WXMD_TOKEN")
@@ -490,7 +480,7 @@ def auth_headers(require_token=False, base=None):
             f"或执行 {script_hint()} set-token wmt_xxxx{apply_hint}")
     raise PublishError(
         f"需要管理密码：请在 {ENV_FILE} 里设置 WXMD_LIST_PASSWORD=xxxx，"
-        f"或设置同名环境变量{apply_hint}")
+        f"或设置 WXMD_TOKEN 以令牌身份访问")
 
 
 def cmd_get(args):
@@ -614,7 +604,7 @@ def cmd_set_token(args):
 
 
 def cmd_token_status(args):
-    """报告当前生效的凭证来源，用于确认 .env 有没有被读到。"""
+    """报告 .env 里读到的凭证，发布报错后用它确认脚本到底读到了什么。"""
     base = base_url(args)
     token = env_value("WXMD_TOKEN")
     password = env_value("WXMD_LIST_PASSWORD")
@@ -625,15 +615,13 @@ def cmd_token_status(args):
         "applyUrl": f"{base}/apply",
         "publishToken": {
             "configured": bool(token),
-            "source": env_source("WXMD_TOKEN") or None,
             "value": mask_secret(token) if token else None,
         },
         "listPassword": {
             "configured": bool(password),
-            "source": env_source("WXMD_LIST_PASSWORD") or None,
         },
         "ready": bool(token or password),
-        "hint": "source 为 '环境变量' 时说明环境变量覆盖了 .env" if token else
+        "hint": "令牌已读到，可以发布" if token else
                 f"未配置令牌：在 {ENV_FILE} 里写 WXMD_TOKEN=wmt_xxxx，"
                 f"或执行 {script_hint()} set-token wmt_xxxx",
     }, ensure_ascii=False, indent=2))
